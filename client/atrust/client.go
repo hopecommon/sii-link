@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -14,10 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/client/atrust/auth"
-	"github.com/mythologyli/zju-connect/internal/underlay"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/client/atrust/auth"
+	"github.com/hopecommon/sii-link/internal/underlay"
+	"github.com/hopecommon/sii-link/log"
 	"inet.af/netaddr"
 )
 
@@ -51,10 +52,34 @@ type Client struct {
 	underlayDialer  *underlay.Dialer
 
 	skipTCPTunnelWait bool
+	casTicketProvider auth.CASTicketProvider
+	verifyServerTLS   bool
+	tcpTunnelPoolSize int
+	tcpTunnelPool     *tcpTunnelPool
 }
 
 func (c *Client) SetSkipTCPTunnelWait(skip bool) {
 	c.skipTCPTunnelWait = skip
+}
+
+func (c *Client) SetCASTicketProvider(provider auth.CASTicketProvider) {
+	c.casTicketProvider = provider
+}
+
+func (c *Client) SetVerifyServerTLS(verify bool) {
+	c.verifyServerTLS = verify
+}
+
+func (c *Client) SetTCPTunnelPoolSize(size int) error {
+	if size < 0 {
+		return fmt.Errorf("aTrust TCP tunnel pool size must not be negative")
+	}
+	c.tcpTunnelPoolSize = size
+	return nil
+}
+
+func (c *Client) loginCookies(saved []auth.Cookie) []auth.Cookie {
+	return saved
 }
 
 func NewClient(username, sid, deviceID, signKey string) *Client {
@@ -72,6 +97,9 @@ func NewClient(username, sid, deviceID, signKey string) *Client {
 func (c *Client) Close() {
 	c.closeOnce.Do(func() {
 		c.lifecycleCancel()
+		if c.tcpTunnelPool != nil {
+			c.tcpTunnelPool.Close()
+		}
 		c.l3TunnelMu.Lock()
 		tunnel := c.l3Tunnel
 		c.l3TunnelMu.Unlock()
@@ -256,6 +284,9 @@ func (c *Client) Setup(serverAddress string, serverPort int, username, password,
 			authServerHost = fmt.Sprintf("%s:%d", serverAddress, serverPort)
 		}
 		sess := auth.NewSession(authServerHost, c.underlayDialer.DialContext)
+		if c.verifyServerTLS {
+			sess.RequireVerifiedTLS()
+		}
 
 		var err error
 		var loginMethod auth.LoginMethod
@@ -269,8 +300,9 @@ func (c *Client) Setup(serverAddress string, serverPort int, username, password,
 			}
 		case "auth/cas":
 			loginMethod = auth.CASLogin{
-				Domain: loginDomain,
-				Ticket: casTicket,
+				Domain:         loginDomain,
+				Ticket:         casTicket,
+				TicketProvider: c.casTicketProvider,
 			}
 		case "auth/httpsOauth2":
 			loginMethod = auth.HTTPSOauth2Login{
@@ -289,9 +321,10 @@ func (c *Client) Setup(serverAddress string, serverPort int, username, password,
 			return nil, fmt.Errorf("unsupported auth type: %s", authType)
 		}
 
+		loginCookies := c.loginCookies(clientAuthData.Cookies)
 		loginResult, err := sess.Login(loginMethod, auth.LoginOptions{
 			DeviceID: c.DeviceID,
-			Cookies:  clientAuthData.Cookies,
+			Cookies:  loginCookies,
 		})
 		if err != nil {
 			log.Println("Login error:", err)
@@ -320,13 +353,18 @@ func (c *Client) Setup(serverAddress string, serverPort int, username, password,
 
 	log.DebugPrintf("SID: %s, DeviceID: %s, ConnectionID: %s, SignKey: %s", c.SID, c.DeviceID, c.ConnectionID, c.SignKey)
 
-	c.BestNodes = getBestNodes(c.NodeGroups, c.underlayDialer.DialContext)
+	initialNodeProbeCount := pingNum
+	if c.casTicketProvider != nil {
+		initialNodeProbeCount = 1
+	}
+	c.BestNodes = getBestNodes(c.NodeGroups, c.underlayDialer.DialContext, initialNodeProbeCount)
 
 	err = c.getIP()
 	if err != nil {
 		return nil, err
 	}
 	c.underlayDialer.ExcludeIP(c.ip)
+	c.startTCPTunnelPool()
 
 	l3Tunnel, err := NewL3Tunnel(c)
 	if err != nil {
@@ -341,6 +379,16 @@ func (c *Client) Setup(serverAddress string, serverPort int, username, password,
 	}
 
 	return authData, nil
+}
+
+func (c *Client) startTCPTunnelPool() {
+	if c.tcpTunnelPoolSize == 0 {
+		return
+	}
+	pool := newTCPTunnelPool(c.tcpTunnelPoolSize, func(ctx context.Context, address string) (net.Conn, error) {
+		return c.underlayDialer.DialTLSContext(ctx, "tcp", address, &tls.Config{InsecureSkipVerify: true})
+	})
+	c.tcpTunnelPool = pool
 }
 
 func newUnderlayDialer(serverHost, bindInterface string, autoDetectInterface bool) *underlay.Dialer {

@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/stack"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/stack"
 )
 
 func handleRequest(stack stack.Stack, conn net.Conn, remoteAddress string) {

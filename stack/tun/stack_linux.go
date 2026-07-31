@@ -10,10 +10,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
 	tun "github.com/mythologyli/sing-tun"
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
 )
 
 type Endpoint struct {
@@ -69,7 +69,7 @@ func NewStack(client client.Client, dnsHijack, fakeIP bool, ipResources []client
 		return nil, err
 	}
 	ipPrefix, _ := netip.ParsePrefix(s.endpoint.ip.String() + "/32")
-	tunName := "ZJU-Connect"
+	tunName := "SII-Link"
 	tunName = tun.CalculateInterfaceName(tunName)
 
 	tunOptions := tun.Options{

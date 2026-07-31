@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/resolve"
-	"github.com/mythologyli/zju-connect/stack"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/resolve"
+	"github.com/hopecommon/sii-link/stack"
 )
 
 import (

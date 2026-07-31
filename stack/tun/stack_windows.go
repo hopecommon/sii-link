@@ -8,16 +8,16 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
 	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/tun"
 	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
 )
 
 const guid = "{4F5CDE94-D2A3-4AA5-A4A3-0FE6CB909E83}"
-const interfaceName = "ZJU Connect"
+const interfaceName = "SII Link"
 
 type Endpoint struct {
 	client client.Client
@@ -133,7 +133,7 @@ func NewStack(client client.Client, dnsHijack, fakeIP bool, ipResources []client
 		log.Printf("Run %s failed: %v", command.String(), err)
 	}
 
-	command = exec.Command("netsh", "interface", "ipv4", "delete", "dnsservers", "ZJU Connect", "all")
+	command = exec.Command("netsh", "interface", "ipv4", "delete", "dnsservers", interfaceName, "all")
 	err = command.Run()
 	if err != nil {
 		log.Printf("Run %s failed: %v", command.String(), err)
@@ -143,7 +143,7 @@ func NewStack(client client.Client, dnsHijack, fakeIP bool, ipResources []client
 		if fakeIP {
 			dnsServerIP = "198.18.0.1"
 		}
-		command = exec.Command("netsh", "interface", "ipv4", "add", "dnsservers", "ZJU Connect", dnsServerIP)
+		command = exec.Command("netsh", "interface", "ipv4", "add", "dnsservers", interfaceName, dnsServerIP)
 		err = command.Run()
 		if err != nil {
 			log.Printf("Run %s failed: %v", command.String(), err)
@@ -152,7 +152,7 @@ func NewStack(client client.Client, dnsHijack, fakeIP bool, ipResources []client
 
 	hook_func.RegisterTerminalFunc("Close Tun Device", func(ctx context.Context) error {
 		dev.Close()
-		closeCommand := exec.Command("netsh", "interface", "ipv4", "delete", "dnsservers", "ZJU Connect", "all")
+		closeCommand := exec.Command("netsh", "interface", "ipv4", "delete", "dnsservers", interfaceName, "all")
 		return closeCommand.Run()
 	})
 	return s, nil

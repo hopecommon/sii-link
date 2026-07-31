@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/stack"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/stack"
 )
 
 const BufferSize = 40960

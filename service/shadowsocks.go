@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/dial"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/dial"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
 	"github.com/shadowsocks/go-shadowsocks2/core"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )

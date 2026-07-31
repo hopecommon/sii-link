@@ -22,12 +22,12 @@ RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     # go build -ldflags="-w -s" -o /app/main ./cmd/openwrt-wan-reconnect/*.go
-    go build -v -o /app/zju-connect -trimpath \
-    -ldflags "-s -w -buildid= -X main.zjuConnectVersion=${VERSION} -X main.CommitID=${COMMIT_ID}" .
+    go build -v -o /app/sii-link -trimpath \
+    -ldflags "-s -w -buildid= -X main.siiLinkVersion=${VERSION} -X main.CommitID=${COMMIT_ID}" .
 
 # Import the binary from build stage
 # use root container, but still use /home/nonroot to keep backward support
 FROM gcr.io/distroless/static as prd
 WORKDIR /home/nonroot
-COPY --from=build /app/zju-connect /home/nonroot
-ENTRYPOINT ["/home/nonroot/zju-connect" ,"-config", "/home/nonroot/config.toml"]
+COPY --from=build /app/sii-link /home/nonroot
+ENTRYPOINT ["/home/nonroot/sii-link" ,"-config", "/home/nonroot/config.toml"]

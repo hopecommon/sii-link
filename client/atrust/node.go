@@ -4,26 +4,31 @@ import (
 	"context"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/mythologyli/zju-connect/internal/ping"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/internal/ping"
+	"github.com/hopecommon/sii-link/log"
 )
 
 const pingNum = 3
 
-func getBestNodes(nodeGroups map[string][]string, dialContext func(context.Context, string, string) (net.Conn, error)) map[string]string {
+func getBestNodes(nodeGroups map[string][]string, dialContext func(context.Context, string, string) (net.Conn, error), probeCount int) map[string]string {
+	if probeCount < 1 {
+		panic("aTrust node probe count must be positive")
+	}
 	bestNodes := make(map[string]string)
 	for group, nodes := range nodeGroups {
 		if len(nodes) > 1 {
 			var pingList []ping.TCPing
+			var pingNodes []string
 			var chList []<-chan struct{}
 
 			for _, node := range nodes {
-				parts := strings.Split(node, ":")
-				host := parts[0]
-				port, err := strconv.Atoi(parts[1])
+				host, portText, err := net.SplitHostPort(node)
+				if err != nil {
+					continue
+				}
+				port, err := strconv.Atoi(portText)
 				if err != nil {
 					continue
 				}
@@ -34,13 +39,14 @@ func getBestNodes(nodeGroups map[string][]string, dialContext func(context.Conte
 					Protocol: ping.TCP,
 					Host:     host,
 					Port:     port,
-					Counter:  pingNum,
+					Counter:  probeCount,
 					Interval: time.Duration(0.5 * float64(time.Second)),
 					Timeout:  time.Duration(1 * float64(time.Second)),
 				}
 				tcping.SetTarget(&target)
 
 				pingList = append(pingList, *tcping)
+				pingNodes = append(pingNodes, node)
 				ch := tcping.Start()
 				chList = append(chList, ch)
 			}
@@ -53,11 +59,11 @@ func getBestNodes(nodeGroups map[string][]string, dialContext func(context.Conte
 			bestNode := ""
 			for i, tcping := range pingList {
 				result := tcping.Result()
-				if result.SuccessCounter == pingNum {
+				if result.SuccessCounter == probeCount {
 					latency := result.Avg().Milliseconds()
 
 					if bestLatency == 0 || latency < bestLatency {
-						bestNode = nodes[i]
+						bestNode = pingNodes[i]
 						bestLatency = latency
 					}
 				}
@@ -89,7 +95,7 @@ func (c *Client) updateBestNodes(ctx context.Context, updateBestNodesInterval in
 		case <-ticker.C:
 		}
 
-		bestNodes := getBestNodes(c.NodeGroups, c.underlayDialer.DialContext)
+		bestNodes := getBestNodes(c.NodeGroups, c.underlayDialer.DialContext, pingNum)
 		c.BestNodesRWMutex.Lock()
 		c.BestNodes = bestNodes
 		c.BestNodesRWMutex.Unlock()

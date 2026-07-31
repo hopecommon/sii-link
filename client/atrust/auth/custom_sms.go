@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 func (s *Session) completeCustomSMS() (authStep, error) {

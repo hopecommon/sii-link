@@ -4,7 +4,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 type L3Conn struct {

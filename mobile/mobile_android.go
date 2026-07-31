@@ -4,9 +4,9 @@ import (
 	"crypto/tls"
 	"sync"
 
-	"github.com/mythologyli/zju-connect/client/easyconnect"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/stack/tun"
+	"github.com/hopecommon/sii-link/client/easyconnect"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/stack/tun"
 )
 
 var vpnClient *easyconnect.Client

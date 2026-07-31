@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/mythologyli/zju-connect/configs"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/configs"
+	"github.com/hopecommon/sii-link/log"
 	netstat "github.com/shirou/gopsutil/v4/net"
 )
 

@@ -37,7 +37,11 @@ func runTCPConnectExchange(t *testing.T, status byte) (error, []byte) {
 			return
 		}
 		probeCh <- probe
-		_, err := server.Write([]byte{0x05, status})
+		response := []byte{0x05, status}
+		if status == 0x00 {
+			response = append(response, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+		}
+		_, err := server.Write(response)
 		serverErrCh <- err
 	}()
 
@@ -47,6 +51,27 @@ func runTCPConnectExchange(t *testing.T, status byte) (error, []byte) {
 		t.Fatalf("server exchange failed: %v", serverErr)
 	}
 	return err, probe
+}
+
+func TestWaitForTCPConnectRejectsMalformedSuccessTrailer(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	go func() {
+		_, _ = server.Write([]byte{0x53, 0x00, 0x00, 0x02, 'O', 'K'})
+		probe := make([]byte, 4)
+		_, _ = io.ReadFull(server, probe)
+		_, _ = server.Write([]byte{
+			0x05, 0x00,
+			0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		})
+	}()
+
+	err := waitForTCPConnect(context.Background(), client, bufio.NewReader(client))
+	if err == nil || !strings.Contains(err.Error(), "unexpected tcp tunnel connect trailer") {
+		t.Fatalf("waitForTCPConnect() error = %v", err)
+	}
 }
 
 func TestWaitForTCPConnectStatus(t *testing.T) {

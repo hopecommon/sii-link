@@ -62,7 +62,20 @@ cas_ticket = ""
 oauth2_code = ""
 phone = ""
 update_best_nodes_interval = 300
+skip_tcp_tunnel_wait = false
+tcp_tunnel_pool_size = 0 # Maximum reusable TLS transports per relay; 0 disables reuse.
 sid = ""
 device_id = ""
 sign_key = ""
 resource_file = ""
+
+# SII unattended CAS settings (macOS Keychain by default)
+sii_unattended_cas = false
+sii_keychain_account = ""
+sii_username_file = ""
+sii_password_file = ""
+sii_cas_proxy = ""
+sii_health_failure_threshold = 3
+sii_health_interval = 300
+sii_health_retry_interval = 2
+sii_health_timeout = 3

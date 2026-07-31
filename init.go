@@ -12,20 +12,20 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/mythologyli/zju-connect/client/atrust"
-	"github.com/mythologyli/zju-connect/configs"
+	"github.com/hopecommon/sii-link/client/atrust"
+	"github.com/hopecommon/sii-link/configs"
 )
 
 var (
-	zjuConnectVersion = "dev"
-	CommitID          string
+	siiLinkVersion = "dev"
+	CommitID       string
 )
 
-func zjuConnectVersionString() string {
+func siiLinkVersionString() string {
 	if CommitID != "" {
-		return zjuConnectVersion + "-" + CommitID
+		return siiLinkVersion + "-" + CommitID
 	}
-	return zjuConnectVersion
+	return siiLinkVersion
 }
 
 func getTOMLVal[T int | uint64 | string | bool](valPointer *T, defaultVal T) T {
@@ -41,7 +41,7 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 
 	_, err := toml.DecodeFile(configFile, &confTOML)
 	if err != nil {
-		return errors.New("ZJU Connect: error parsing the config file")
+		return errors.New("SII Link: error parsing the config file")
 	}
 
 	conf.Protocol = getTOMLVal(confTOML.Protocol, "easyconnect")
@@ -69,6 +69,9 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 	conf.AddRoute = getTOMLVal(confTOML.AddRoute, false)
 	conf.DNSTTL = getTOMLVal(confTOML.DNSTTL, uint64(3600))
 	conf.DebugDump = getTOMLVal(confTOML.DebugDump, false)
+	conf.LogFile = getTOMLVal(confTOML.LogFile, "")
+	conf.LogMaxSizeMB = getTOMLVal(confTOML.LogMaxSizeMB, 5)
+	conf.LogMaxBackups = getTOMLVal(confTOML.LogMaxBackups, 3)
 	conf.DisableKeepAlive = getTOMLVal(confTOML.DisableKeepAlive, false)
 	conf.KeepAliveURL = getTOMLVal(confTOML.KeepAliveURL, "")
 	conf.RemoteDNSServer = getTOMLVal(confTOML.RemoteDNSServer, "auto")
@@ -91,18 +94,34 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 	conf.ResourceFile = getTOMLVal(confTOML.ResourceFile, "")
 	conf.UpdateBestNodesInterval = getTOMLVal(confTOML.UpdateBestNodesInterval, 300)
 	conf.SkipTCPTunnelWait = getTOMLVal(confTOML.SkipTCPTunnelWait, false)
+	conf.TCPTunnelPoolSize = getTOMLVal(confTOML.TCPTunnelPoolSize, 0)
+	conf.SIIUnattendedCAS = getTOMLVal(confTOML.SIIUnattendedCAS, false)
+	conf.SIIKeychainAccount = getTOMLVal(confTOML.SIIKeychainAccount, "")
+	conf.SIIUsernameFile = getTOMLVal(confTOML.SIIUsernameFile, "")
+	conf.SIIPasswordFile = getTOMLVal(confTOML.SIIPasswordFile, "")
+	conf.SIICASProxy = getTOMLVal(confTOML.SIICASProxy, "")
+	conf.SIIHealthFailures = getTOMLVal(confTOML.SIIHealthFailures, 3)
+	conf.SIIHealthInterval = getTOMLVal(confTOML.SIIHealthInterval, 300)
+	conf.SIIHealthRetry = getTOMLVal(confTOML.SIIHealthRetry, 2)
+	conf.SIIHealthTimeout = getTOMLVal(confTOML.SIIHealthTimeout, 3)
+	if conf.LogFile != "" && conf.LogMaxSizeMB <= 0 {
+		return errors.New("SII Link: log_max_size_mb must be greater than zero")
+	}
+	if conf.LogMaxBackups < 0 {
+		return errors.New("SII Link: log_max_backups must not be negative")
+	}
 
 	for _, singlePortForwarding := range confTOML.PortForwarding {
 		if singlePortForwarding.NetworkType == nil {
-			return errors.New("ZJU Connect: network type is not set")
+			return errors.New("SII Link: network type is not set")
 		}
 
 		if singlePortForwarding.BindAddress == nil {
-			return errors.New("ZJU Connect: bind address is not set")
+			return errors.New("SII Link: bind address is not set")
 		}
 
 		if singlePortForwarding.RemoteAddress == nil {
-			return errors.New("ZJU Connect: remote address is not set")
+			return errors.New("SII Link: remote address is not set")
 		}
 
 		conf.PortForwardingList = append(conf.PortForwardingList, configs.SinglePortForwarding{
@@ -114,12 +133,12 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 
 	for _, singleCustomDns := range confTOML.CustomDNS {
 		if singleCustomDns.HostName == nil {
-			return errors.New("ZJU Connect: host name is not set")
+			return errors.New("SII Link: host name is not set")
 		}
 
 		if singleCustomDns.IP == nil {
-			fmt.Println("ZJU Connect: IP is not set")
-			return errors.New("ZJU Connect: IP is not set")
+			fmt.Println("SII Link: IP is not set")
+			return errors.New("SII Link: IP is not set")
 		}
 
 		conf.CustomDNSList = append(conf.CustomDNSList, configs.SingleCustomDNS{
@@ -131,8 +150,8 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 	for _, singleCustomProxyDomain := range confTOML.CustomProxyDomain {
 		var domainRegex = regexp.MustCompile(`^[a-zA-Z\d-]+(\.[a-zA-Z\d-]+)*\.[a-zA-Z]{2,}$`)
 		if !domainRegex.MatchString(singleCustomProxyDomain) {
-			fmt.Printf("ZJU Connect: %s is not a valid domain\n", singleCustomProxyDomain)
-			return fmt.Errorf("ZJU Connect: %s is not a valid domain", singleCustomProxyDomain)
+			fmt.Printf("SII Link: %s is not a valid domain\n", singleCustomProxyDomain)
+			return fmt.Errorf("SII Link: %s is not a valid domain", singleCustomProxyDomain)
 		}
 		conf.CustomProxyDomain = append(conf.CustomProxyDomain, singleCustomProxyDomain)
 	}
@@ -172,12 +191,15 @@ func init() {
 	flag.BoolVar(&conf.AddRoute, "add-route", false, "Add route from rules for TUN interface")
 	flag.Uint64Var(&conf.DNSTTL, "dns-ttl", 3600, "DNS record time to live, unit is second")
 	flag.BoolVar(&conf.DebugDump, "debug-dump", false, "Enable traffic debug dump (only for debug usage)")
+	flag.StringVar(&conf.LogFile, "log-file", "", "Write logs to a size-bounded rotating file")
+	flag.IntVar(&conf.LogMaxSizeMB, "log-max-size-mb", 5, "Maximum size of each log file in MiB")
+	flag.IntVar(&conf.LogMaxBackups, "log-max-backups", 3, "Number of rotated log files to retain")
 	flag.BoolVar(&conf.DisableKeepAlive, "disable-keep-alive", false, "Disable keep alive")
 	flag.StringVar(&conf.KeepAliveURL, "keep-alive-url", "", "Keep alive URL, default is empty (use DNS keep alive)")
 	flag.StringVar(&conf.RemoteDNSServer, "zju-dns-server", "auto", "Remote DNS server address. Set to 'auto' to use remote DNS server provided by server") // TODO: rename to remote-dns-server
 	flag.StringVar(&conf.SecondaryDNSServer, "secondary-dns-server", "114.114.114.114", "Secondary DNS server address. Leave empty to use system default DNS server")
 	flag.StringVar(&conf.DNSServerBind, "dns-server-bind", "", "The address DNS server listens on (e.g. 127.0.0.1:53)")
-	flag.BoolVar(&conf.DNSHijack, "dns-hijack", false, "Hijack all dns query to ZJU Connect. False by default.")
+	flag.BoolVar(&conf.DNSHijack, "dns-hijack", false, "Hijack all dns query to SII Link. False by default.")
 	flag.BoolVar(&conf.FakeIP, "fake-ip", false, "Enable Fake IP for DNS hijack")
 	flag.StringVar(&conf.GraphCodeFile, "graph-code-file", "", "Graph Check Code File")
 	flag.StringVar(&conf.BindInterface, "bind-interface", "", "Bind VPN underlay connections to this network interface (takes precedence over auto detection)")
@@ -195,6 +217,16 @@ func init() {
 	flag.StringVar(&conf.ResourceFile, "resource-file", "", "aTrust Resource File (mostly for debug usage)")
 	flag.IntVar(&conf.UpdateBestNodesInterval, "update-best-nodes-interval", 300, "Interval to update best nodes in seconds. Set to 0 to disable")
 	flag.BoolVar(&conf.SkipTCPTunnelWait, "skip-tcp-tunnel-wait", false, "Don't wait for aTrust TCP tunnel connection status")
+	flag.IntVar(&conf.TCPTunnelPoolSize, "tcp-tunnel-pool-size", 0, "Maximum reusable aTrust TCP tunnel transports per relay")
+	flag.BoolVar(&conf.SIIUnattendedCAS, "sii-unattended-cas", false, "Enable unattended CAS authentication for vpn.sii.edu.cn")
+	flag.StringVar(&conf.SIIKeychainAccount, "sii-keychain-account", "", "macOS Keychain account for SII CAS credentials")
+	flag.StringVar(&conf.SIIUsernameFile, "sii-username-file", "", "Private file containing the SII CAS username")
+	flag.StringVar(&conf.SIIPasswordFile, "sii-password-file", "", "Private file containing the SII CAS password")
+	flag.StringVar(&conf.SIICASProxy, "sii-cas-proxy", "", "Optional HTTP/HTTPS proxy URL for SII CAS requests")
+	flag.IntVar(&conf.SIIHealthFailures, "sii-health-failure-threshold", 3, "Consecutive keep-alive failures before exiting for restart; 0 disables")
+	flag.IntVar(&conf.SIIHealthInterval, "sii-health-interval", 300, "Idle SII health-check interval in seconds; macOS wake events trigger an immediate check")
+	flag.IntVar(&conf.SIIHealthRetry, "sii-health-retry-interval", 2, "SII health-check retry interval in seconds after a failure")
+	flag.IntVar(&conf.SIIHealthTimeout, "sii-health-timeout", 3, "SII HTTP health-check timeout in seconds")
 	flag.StringVar(&tcpPortForwarding, "tcp-port-forwarding", "", "TCP port forwarding (e.g. 0.0.0.0:9898-10.10.98.98:80,127.0.0.1:9899-10.10.98.98:80)")
 	flag.StringVar(&udpPortForwarding, "udp-port-forwarding", "", "UDP port forwarding (e.g. 127.0.0.1:53-10.10.0.21:53)")
 	flag.StringVar(&customDns, "custom-dns", "", "Custom set dns lookup (e.g. www.cc98.org:10.10.98.98,appservice.zju.edu.cn:10.203.8.198)")
@@ -208,7 +240,7 @@ func init() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("ZJU Connect %s\n", zjuConnectVersionString())
+		fmt.Printf("SII Link %s\nSource: https://github.com/hopecommon/sii-link\n", siiLinkVersionString())
 		os.Exit(0)
 	}
 
@@ -272,7 +304,7 @@ func init() {
 			for _, forwardingString := range forwardingStringList {
 				addressStringList := strings.Split(forwardingString, "-")
 				if len(addressStringList) != 2 {
-					fmt.Fprintln(os.Stderr, "ZJU Connect: wrong tcp port forwarding format")
+					fmt.Fprintln(os.Stderr, "SII Link: wrong tcp port forwarding format")
 					os.Exit(1)
 				}
 
@@ -289,7 +321,7 @@ func init() {
 			for _, forwardingString := range forwardingStringList {
 				addressStringList := strings.Split(forwardingString, "-")
 				if len(addressStringList) != 2 {
-					fmt.Fprintln(os.Stderr, "ZJU Connect: wrong udp port forwarding format")
+					fmt.Fprintln(os.Stderr, "SII Link: wrong udp port forwarding format")
 					os.Exit(1)
 				}
 
@@ -306,7 +338,7 @@ func init() {
 			for _, dnsString := range dnsList {
 				dnsStringSplit := strings.Split(dnsString, ":")
 				if len(dnsStringSplit) != 2 {
-					fmt.Fprintln(os.Stderr, "ZJU Connect: wrong custom dns format")
+					fmt.Fprintln(os.Stderr, "SII Link: wrong custom dns format")
 					os.Exit(1)
 				}
 
@@ -322,7 +354,7 @@ func init() {
 			for _, domain := range domainList {
 				var domainRegex = regexp.MustCompile(`^[a-zA-Z\d-]+(\.[a-zA-Z\d-]+)*\.[a-zA-Z]{2,}$`)
 				if !domainRegex.MatchString(domain) {
-					fmt.Fprintf(os.Stderr, "ZJU Connect: %s is not a valid domain\n", domain)
+					fmt.Fprintf(os.Stderr, "SII Link: %s is not a valid domain\n", domain)
 					os.Exit(1)
 				}
 				conf.CustomProxyDomain = append(conf.CustomProxyDomain, domain)
@@ -346,8 +378,8 @@ func init() {
 		}
 	}
 	if missing {
-		fmt.Println("ZJU Connect: missing required arguments")
-		fmt.Println("Please see: https://github.com/mythologyli/zju-connect")
+		fmt.Println("SII Link: missing required arguments")
+		fmt.Println("Please see: https://github.com/hopecommon/sii-link")
 		fmt.Println("\nUsage:")
 		flag.PrintDefaults()
 
@@ -355,10 +387,10 @@ func init() {
 	}
 
 	if conf.Protocol == "atrust" && conf.ServerAddress == "rvpn.zju.edu.cn" {
-		fmt.Println("ZJU Connect: set default aTrust server address to vpn.zju.edu.cn")
+		fmt.Println("SII Link: set default aTrust server address to vpn.zju.edu.cn")
 		conf.ServerAddress = "vpn.zju.edu.cn"
 	} else if conf.Protocol == "easyconnect" && conf.ServerAddress == "vpn.zju.edu.cn" {
-		fmt.Println("ZJU Connect: set default EasyConnect server address to rvpn.zju.edu.cn")
+		fmt.Println("SII Link: set default EasyConnect server address to rvpn.zju.edu.cn")
 		conf.ServerAddress = "rvpn.zju.edu.cn"
 	}
 }

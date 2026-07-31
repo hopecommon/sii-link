@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 	"github.com/pquerna/otp/totp"
 	utls "github.com/refraction-networking/utls"
 )

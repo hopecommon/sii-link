@@ -10,10 +10,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
 	tun "github.com/mythologyli/sing-tun"
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
 	"golang.org/x/sys/unix"
 	"inet.af/netaddr"
 )

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/client"
+	"github.com/hopecommon/sii-link/client"
 )
 
 type L3Tunnel struct {

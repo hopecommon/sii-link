@@ -7,11 +7,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/dial"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/dial"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
 )
 
 // The MIT License (MIT)
@@ -67,7 +68,7 @@ func ServeHTTP(bindAddr string, dialer *dial.Dialer) {
 
 			w.WriteHeader(200)
 
-			_, bio, err := hijacker.Hijack()
+			clientConn, bio, err := hijacker.Hijack()
 			if err != nil {
 				w.WriteHeader(500)
 				_, _ = w.Write([]byte(err.Error() + "\n"))
@@ -75,12 +76,7 @@ func ServeHTTP(bindAddr string, dialer *dial.Dialer) {
 				return
 			}
 
-			go func() {
-				_, _ = io.Copy(serverConn, bio)
-			}()
-			go func() {
-				_, _ = io.Copy(bio, serverConn)
-			}()
+			go bridgeHTTPConnect(clientConn, bio, serverConn)
 		} else {
 			req.RequestURI = ""
 
@@ -91,14 +87,9 @@ func ServeHTTP(bindAddr string, dialer *dial.Dialer) {
 				return
 			}
 
-			hdr := w.Header()
-			for k, v := range resp.Header {
-				hdr[k] = v
+			if err := writeHTTPResponse(w, resp); err != nil {
+				log.Printf("Write HTTP proxy response failed: %s", err)
 			}
-
-			w.WriteHeader(resp.StatusCode)
-
-			_, _ = io.Copy(w, resp.Body)
 		}
 	})
 
@@ -123,4 +114,39 @@ func ServeHTTP(bindAddr string, dialer *dial.Dialer) {
 			log.Println("HTTP listen failed: " + err.Error())
 		}
 	}
+}
+
+func writeHTTPResponse(w http.ResponseWriter, resp *http.Response) (err error) {
+	defer func() {
+		err = errors.Join(err, resp.Body.Close())
+	}()
+	hdr := w.Header()
+	for key, values := range resp.Header {
+		hdr[key] = values
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(w, resp.Body)
+	return err
+}
+
+func bridgeHTTPConnect(clientConn net.Conn, client io.ReadWriter, serverConn net.Conn) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(serverConn, client)
+		if closeWriter, ok := serverConn.(interface{ CloseWrite() error }); ok {
+			_ = closeWriter.CloseWrite()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(client, serverConn)
+		if closeWriter, ok := clientConn.(interface{ CloseWrite() error }); ok {
+			_ = closeWriter.CloseWrite()
+		}
+	}()
+	wg.Wait()
+	_ = serverConn.Close()
+	_ = clientConn.Close()
 }

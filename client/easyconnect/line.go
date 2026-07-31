@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mythologyli/zju-connect/internal/ping"
+	"github.com/hopecommon/sii-link/internal/ping"
 )
 
 const pingNum = 3

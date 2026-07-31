@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 type QueryDeviceResult struct {

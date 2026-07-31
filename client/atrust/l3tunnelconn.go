@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 const (
@@ -498,6 +498,7 @@ func buildAuthRequest(info clientInfo, signKey []byte, meta packetMeta, ct *conn
 }
 
 func defaultEnv(info clientInfo) *trustEnv {
+	// Keep the upstream process metadata for aTrust protocol compatibility.
 	procPath := "/usr/bin/zju-connect"
 	procName := "zju-connect"
 	fingerprint := fmt.Sprintf("%X", sha256.Sum256([]byte(procPath)))

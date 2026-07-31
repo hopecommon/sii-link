@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 const captchaPageHTML = `<!DOCTYPE html>
@@ -17,7 +17,7 @@ const captchaPageHTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>zju-connect 验证码</title>
+<title>SII Link 验证码</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -134,7 +134,7 @@ var isSubmitting = false;
 
 var I18N = {
   zh: {
-    title: 'zju-connect 验证码',
+    title: 'SII Link 验证码',
     heading: '请按顺序点击图中指定的文字',
     hint: '在验证码图片上依次点击对应文字的位置',
     undo: '撤销上一个', clear: '全部清除',
@@ -147,7 +147,7 @@ var I18N = {
     debugSummary: '调试信息'
   },
   en: {
-    title: 'zju-connect Captcha',
+    title: 'SII Link Captcha',
     heading: 'Click the specified characters in order',
     hint: 'Click the matching characters on the captcha image in sequence.',
     undo: 'Undo', clear: 'Clear',

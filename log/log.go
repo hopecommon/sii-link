@@ -5,12 +5,39 @@ import (
 	"io"
 	"log"
 	"os"
+	"sync"
 )
 
-var debug bool
+var (
+	debug    bool
+	output   io.Writer = os.Stdout
+	outputMu sync.RWMutex
+)
 
 func Init() {
-	log.SetOutput(os.Stdout)
+	setOutput(os.Stdout)
+}
+
+func ConfigureFile(path string, maxBytes int64, backups int) (io.Closer, error) {
+	writer, err := newRotatingWriter(path, maxBytes, backups)
+	if err != nil {
+		return nil, err
+	}
+	setOutput(writer)
+	return writer, nil
+}
+
+func setOutput(writer io.Writer) {
+	outputMu.Lock()
+	output = writer
+	log.SetOutput(writer)
+	outputMu.Unlock()
+}
+
+func currentOutput() io.Writer {
+	outputMu.RLock()
+	defer outputMu.RUnlock()
+	return output
 }
 
 func EnableDebug() {
@@ -60,7 +87,7 @@ func Fatalf(format string, v ...any) {
 }
 
 func DumpHex(buf []byte) {
-	stdoutDumper := hex.Dumper(os.Stdout)
+	stdoutDumper := hex.Dumper(currentOutput())
 	defer func(stdoutDumper io.WriteCloser) {
 		_ = stdoutDumper.Close()
 	}(stdoutDumper)
@@ -69,7 +96,7 @@ func DumpHex(buf []byte) {
 
 func DebugDumpHex(buf []byte) {
 	if debug {
-		stdoutDumper := hex.Dumper(os.Stdout)
+		stdoutDumper := hex.Dumper(currentOutput())
 		defer func(stdoutDumper io.WriteCloser) {
 			_ = stdoutDumper.Close()
 		}(stdoutDumper)
@@ -78,5 +105,5 @@ func DebugDumpHex(buf []byte) {
 }
 
 func NewLogger(prefix string) *log.Logger {
-	return log.New(os.Stdout, prefix, log.LstdFlags)
+	return log.New(currentOutput(), prefix, log.LstdFlags)
 }

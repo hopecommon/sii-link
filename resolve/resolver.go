@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/ippool"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/stack"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/ippool"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/stack"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -201,7 +201,6 @@ func (r *Resolver) Close() {
 	})
 }
 
-
 func NewResolver(stack stack.Stack, remoteDNSServer, secondaryDNSServer string, ttl uint64, domainResources map[string]client.DomainResource, dnsResource map[string]net.IP, useRemoteDNS bool) *Resolver {
 	//domainSuffixTree := domainsuffixtrie.NewDomainSuffixTrie[bool]()
 	//for domain := range domainResource {
@@ -227,11 +226,11 @@ func NewResolver(stack stack.Stack, remoteDNSServer, secondaryDNSServer string, 
 				})
 			},
 		},
-		ttl:              ttl,
-		domainResources:  domainResources,
-		dnsResource:      dnsResource,
-		dnsCache:         cache.New(time.Duration(ttl)*time.Second, time.Duration(ttl)*2*time.Second),
-		useRemoteDNS: useRemoteDNS,
+		ttl:             ttl,
+		domainResources: domainResources,
+		dnsResource:     dnsResource,
+		dnsCache:        cache.New(time.Duration(ttl)*time.Second, time.Duration(ttl)*2*time.Second),
+		useRemoteDNS:    useRemoteDNS,
 	}
 
 	if secondaryDNSServer != "" {

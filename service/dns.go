@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/resolve"
 	"github.com/miekg/dns"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/resolve"
 )
 
 type DNSServer struct {

@@ -1,267 +1,146 @@
-# ZJU Connect
+# SII Link
 
-> 🚫 **免责声明**
->
-> 本程序**按原样提供**，作者**不对程序的正确性或可靠性提供保证**，请使用者自行判断具体场景是否适合使用该程序，**使用该程序造成的问题或后果由使用者自行承担**！
+[English](README_en.md) | 中文
 
----
+SII Link 是一个面向 SII aTrust 场景的轻量命令行客户端。它直接以 Go
+二进制运行，提供本地 SOCKS5/HTTP 代理、无人值守 CAS、macOS Keychain
+凭据读取、休眠唤醒后的事件驱动健康检查，以及有界日志轮转。它适合不想为
+单个 VPN 长期运行完整 Docker 环境的个人用户。
 
-中文 | [English](README_en.md)
+> **非官方项目。** SII Link 由社区独立维护，与 SII、ZJU、深信服及其关联方
+> 没有从属、授权或背书关系。请遵守所在机构的网络和账号政策；软件按原样
+> 提供，使用风险由使用者承担。
 
-**本程序基于 [EasierConnect](https://github.com/lyc8503/EasierConnect)（现已停止维护）完成，感谢原作者 [lyc8503](https://github.com/lyc8503)。**
+SII Link 是 [ZJU Connect](https://github.com/Mythologyli/zju-connect) 的修改版，
+后者基于 [EasierConnect](https://github.com/lyc8503/EasierConnect)。感谢原项目
+作者和所有贡献者。派生关系、修改范围和第三方许可见 [NOTICE.md](NOTICE.md)。
 
-**QQ 交流群：1037726410**，欢迎使用者加入交流。
+## 设计目标
+
+- 原生运行：无需 Docker daemon、特权容器或 TUN 权限即可提供本地代理。
+- 无人值守：会话失效时从 macOS Keychain 重新完成 SII CAS，静态密码不进入
+  TOML、状态文件或日志。
+- 快速恢复：macOS 唤醒事件立即触发检查；正常空闲检查保持低频，避免 15 秒
+  轮询带来的额外唤醒。
+- 稳定延迟：可选的 aTrust 短隧道连接池与首包/建链重叠减少重复 TLS 建链。
+- 有界存储：默认单日志 5 MiB、保留 3 份备份，日志总量约不超过 20 MiB。
+- 保留通用能力：EasyConnect/aTrust、SOCKS5、HTTP、DNS、端口转发和 TUN
+  等上游功能仍在；完整历史用法可参考上游文档和 `sii-link -h`。
 
-### 使用方法
+## macOS 快速开始
 
-#### 使用 GUI 版客户端
+从 [Releases](https://github.com/hopecommon/sii-link/releases) 下载对应架构，或运行：
 
-+ 如果你是来自 ZJU 的用户：
-  + Windows 用户推荐使用 [ZJU Connect for Windows](https://github.com/mythologyli/zju-connect-for-Windows)。
-  + Linux/macOS 用户可以尝试使用 [Chenx Dust](https://github.com/chenx-dust) 开发的客户端 [EZ4Connect](https://github.com/chenx-dust/EZ4Connect)（推荐，支持 aTrust 协议）或 [kowyo](https://github.com/kowyo) 开发的客户端 [hitsz-connect-verge](https://github.com/kowyo/hitsz-connect-verge)。
-    注意请设置服务器地址为 `rvpn.zju.edu.cn:443`。
-+ 如果你是非 ZJU 的用户：
+```bash
+curl -fsSL https://raw.githubusercontent.com/hopecommon/sii-link/main/scripts/install-macos.sh | sh
+```
 
-  可以尝试使用 [Chenx Dust](https://github.com/chenx-dust) 开发的客户端 [EZ4Connect](https://github.com/chenx-dust/EZ4Connect)（推荐，支持 aTrust 协议）或 [kowyo](https://github.com/kowyo) 开发的客户端 [hitsz-connect-verge](https://github.com/kowyo/hitsz-connect-verge)。
+把 CAS 凭据存入当前用户 Keychain。下面命令不会把密码写入仓库；执行时会由
+`security` 交互读取：
 
-#### 直接运行
+```bash
+security add-generic-password -U -a "$USER" -s atrust.username -w
+security add-generic-password -U -a "$USER" -s atrust.password -w
+```
 
-##### 使用 EasyConnect 协议
+复制 [configs/sii-local.toml.example](configs/sii-local.toml.example) 为
+`~/.config/sii-link/config.toml`，替换其中的绝对路径和 macOS 账号。推荐正式路径：
 
-+ 如果你是来自 ZJU 的用户：
+```text
+~/.local/bin/sii-link
+~/.config/sii-link/config.toml
+~/.local/state/sii-link/client-data.json
+~/Library/Logs/sii-link/sii-link.log
+~/Library/LaunchAgents/dev.hopecommon.sii-link.plist
+```
 
-  1. 在 [Release](https://github.com/mythologyli/zju-connect/releases) 页面下载对应平台的最新版本。
+将 [LaunchAgent 模板](deploy/dev.hopecommon.sii-link.plist.example) 中的路径替换为
+绝对路径后安装：
 
-  2. 以 macOS 为例，解压出可执行文件 `zju-connect`。
+```bash
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.hopecommon.sii-link.plist"
+launchctl enable "gui/$(id -u)/dev.hopecommon.sii-link"
+launchctl kickstart -k "gui/$(id -u)/dev.hopecommon.sii-link"
+```
 
-  3. macOS 需要先解除安全限制。命令行运行：`sudo xattr -rd com.apple.quarantine zju-connect`。
+服务会在图形登录后自动启动。FileVault 登录前不会启动；若 CAS cookie 已过期，
+首次后台访问 Keychain 可能需要用户确认。
 
-  4. 命令行运行：`./zju-connect -protocol easyconnect -username <上网账户> -password <密码>`。
+## 端口和兼容性
 
-  5. 此时 `1080` 端口为 Socks5 代理，`1081` 端口为 HTTP 代理。如需更改默认端口，请参考参数说明。
+正式 SII 配置保持旧方案端口不变：
 
-+ 如果你是非 ZJU 的用户：
+| 接口 | 地址 |
+| --- | --- |
+| SOCKS5 | `127.0.0.1:1080` |
+| HTTP | `127.0.0.1:8888` |
 
-  其他步骤与上述相同，运行参数请尝试设置为：
+因此 FlClash 等下游配置无需改端口。SSH 可直接使用宿主 SOCKS：
 
-  `./zju-connect -server <服务器地址> -port <服务器端口> -username xxx -password xxx -disable-zju-config -skip-domain-resource -zju-dns-server auto`
+```sshconfig
+ProxyCommand /usr/bin/nc -X 5 -x 127.0.0.1:1080 %h %p
+```
 
-  如果你的服务器需要输入图形验证码，运行参数请尝试设置为：
+同一账号通常不应同时运行旧 Docker 会话和 SII Link；它们可能互踢，也会争用
+本地端口。迁移时保留旧容器作为静态回滚项，但只启动其中一套。
 
-  `./zju-connect -server <服务器地址> -port <服务器端口> -username xxx -password xxx -disable-zju-config -skip-domain-resource -zju-dns-server auto -disable-multi-line -graph-code-file graph_code.jpg`
+## 配置要点
 
-  登录时会将图片保存至 `graph_code.jpg` 文件，请查看并手动输入验证码。
+```toml
+protocol = "atrust"
+server_address = "vpn.sii.edu.cn"
+server_port = 443
+auth_type = "auth/cas"
+login_domain = "cas.sii.edu.cn"
 
-  *详情见此[链接](https://github.com/Mythologyli/zju-connect/issues/65#issuecomment-2650185322)*
+sii_unattended_cas = true
+sii_keychain_account = "YOUR_MACOS_ACCOUNT"
+client_data_file = "/ABSOLUTE/PATH/TO/client-data.json"
 
-##### 使用 aTrust 协议
-
-+ 如果你是来自 ZJU 的用户：
-
-  其他步骤与 EasyConnect 相同，运行参数请设置为：
-
-  `./zju-connect -protocol atrust -username <上网账户> -password <密码> -client-data-file client_data.json`
-
-  之后按照提示操作。如果你不希望保存登录状态，可以不填 `-client-data-file` 参数。
-
-+ 如果你是非 ZJU 的用户：
-
-  其他步骤与 ZJU 用户相同，请根据情况指定登录域及协议。
-
-  **如何确定登录域及协议？**
-
-  1. 运行 `./zju-connect -protocol atrust -server <服务器地址> -port <服务器端口> -auth-info`。
-  2. 该命令会获取可用的认证方式，例如
-     ```json
-     [{"loginDomain":"Radius","authType":"auth/psw","authName":"上网账号","loginUrl":""},{"loginDomain":"local","authType":"auth/psw","authName":"IDC运维账号","loginUrl":""},{"loginDomain":"radius93482","authType":"auth/psw","authName":"INTL ID","loginUrl":""}]
-     ```
-     包含三个登录方式。方式一的登录域为 `Radius`，认证类型为 `auth/psw`。如果要使用方式一登录，则需要在运行参数中添加 `-login-domain Radius -auth-type "auth/psw"`。
-  3. 目前支持的认证类型包括 `auth/psw`（密码验证）、`auth/cas`（CAS 验证）、`auth/smsCheckCode`（短信验证码验证）。
-
-#### 作为服务运行
-
-[链接](docs/service.md)
-
-#### Docker 运行
-
-[链接](docs/docker.md)
-
-### 警告
-
-1. 当使用其他开启了 TUN 模式的代理工具，同时配合 zju-connect 作为下游代理时，请注意务必提供正确的分流规则，参考[此 issue](https://github.com/Mythologyli/zju-connect/issues/57)
-
-### TUN 模式注意事项
-
-1. 需要管理员权限运行
-
-2. Windows 系统需要前往 [Wintun 官网](https://www.wintun.net)下载 `wintun.dll` 并放置于可执行文件同目录下
-
-3. EasyConnect 协议下的推荐配置为 `-tun-mode -add-route -dns-hijack`
-
-4. aTrust 协议下的推荐配置为 `-tun-mode -add-route -dns-hijack -fake-ip`。在使用 aTrust 协议时，如果不使用 DNS劫持/Fake IP，直接通过 TUN 网卡的涉及域名的 TCP 流量可能会出错
-
-### 参数说明
-
-#### 通用参数
-
-+ `protocol`: 登录协议，支持 `easyconnect`/`atrust`，默认为 `easyconnect`
-
-+ `server`: VPN 服务端地址，默认为 `rvpn.zju.edu.cn`/`vpn.zju.edu.cn`
-
-+ `port`: VPN 服务端端口，默认为 `443`
-
-+ `username`: 网络账户。例如：学号
-
-+ `password`: 网络账户密码
-
-+ `graph-code-file`: 图形验证码文件路径。默认为空。在 aTrust 模式下，留空时使用浏览器完成验证码，设置路径则登录时会将图形验证码保存至该文件，由用户手动输入 JSON
-
-+ `disable-zju-config`: 禁用 ZJU 相关配置，非 ZJU 用户可能需要添加此参数
-
-+ `disable-zju-dns`: 禁用远端 DNS 改用本地 DNS，一般不需要加此参数
-
-+ `socks-bind`: SOCKS5 代理监听地址，默认为 `:1080`
-
-+ `socks-user`: SOCKS5 代理用户名，不填则不需要认证
-
-+ `socks-passwd`: SOCKS5 代理密码，不填则不需要认证
-
-+ `http-bind`: HTTP 代理监听地址，默认为 `:1081`。为 `""` 时不启用 HTTP 代理
-
-+ `shadowsocks-url`: Shadowsocks 服务端 URL。例如：`ss://aes-128-gcm:password@server:port`。格式[参考此处](https://github.com/shadowsocks/go-shadowsocks2)
-
-+ `dial-direct-proxy`: 当 URL 未命中规则，切换到直连时使用代理，常用于与其他代理工具配合的场景，目前仅支持 http 代理。例如：`http://127.0.0.1:7890"`，为 `""` 时不启用
-
-+ `tcp-tunnel-mode`: TCP 隧道模式，默认为 `false`。启用后仅可通过 TCP 隧道代理 TCP 流量。由于只有 aTrust 支持 TCP 隧道，此模式在 EasyConnect 下无效。启用后会禁用 TUN 模式
-
-+ `skip-tcp-tunnel-wait`: 不等待 aTrust TCP 隧道连接状态，默认为 `false`。仅用于兼容不返回连接状态的服务端；启用后连接失败可能要到后续读写时才能发现
-
-+ `tun-mode`: TUN 模式（实验性）。请阅读 TUN 模式注意事项
-
-+ `add-route`: 启用 TUN 模式时根据服务端下发配置添加路由
-
-+ `dns-ttl`: DNS 缓存时间，默认为 `3600` 秒
-
-+ `disable-keep-alive`: 禁用定时保活，一般不需要加此参数
-
-+ `keep-alive-url`: 使用 HTTP 保活，适用于服务端不下发 DNS 的情况。填写要访问的 URL，例如 `https://www.cnki.net/favicon.ico` 。默认为空，此时使用服务端下发的 DNS 保活
-
-+ `zju-dns-server`: 远端 DNS 服务器地址，默认为 `auto`。设置为 auto 时使用从服务端获取的 DNS 服务器，如果未能获取则禁用远端 DNS
-
-+ `secondary-dns-server`: 当使用远端 DNS 服务器无法解析时使用的备用 DNS 服务器，默认为 `114.114.114.114`。留空则使用系统默认 DNS，但在开启 `dns-hijack` 时必须设置
-
-+ `dns-server-bind`: DNS 服务器监听地址，默认为空即禁用。例如，设置为 `127.0.0.1:53`，则可向 `127.0.0.1:53` 发起 DNS 请求
-
-+ `dns-hijack`: 启用 TUN 模式时劫持 DNS 请求，建议在启用 TUN 模式时添加此参数
-
-+ `fake-ip`: 启用 Fake IP 功能，与 dns-hijack 配合使用，建议在使用 aTrust 协议并启用 TUN 模式时添加此参数。此参数在 EasyConnect 协议下无效
-
-+ `debug-dump`: 是否开启调试，一般不需要加此参数
-
-+ `bind-interface`: 手动指定 VPN 底层连接使用的网卡接口，支持 EasyConnect 和 aTrust。非空时优先使用该接口，不再自动探测
-
-+ `auto-detect-interface`: 自动探测并绑定 VPN 底层网卡，默认为 `false`。设为 `true` 时启用自动探测；未启用且未指定 `bind-interface` 时，底层连接使用系统路由。**若同时使用其他启用了 Fake IP 的 VPN，此功能可能无法正常工作**
-
-+ `tcp-port-forwarding`: TCP 端口转发，格式为 `本地地址-远程地址,本地地址-远程地址,...`，例如 `127.0.0.1:9898-10.10.98.98:80,0.0.0.0:9899-10.10.98.98:80`。多个转发用 `,` 分隔
-
-+ `udp-port-forwarding`: UDP 端口转发，格式为 `本地地址-远程地址,本地地址-远程地址,...`，例如 `127.0.0.1:53-10.10.0.21:53`。多个转发用 `,` 分隔
-
-+ `custom-dns`: 指定自定义 DNS 解析结果，格式为 `域名:IP,域名:IP,...`，例如 `www.cc98.org:10.10.98.98,appservice.zju.edu.cn:10.203.8.198`。多个解析用 `,` 分隔
-
-+ `config`: 指定配置文件，内容参考 `config.toml.example`。启用配置文件时其他参数无效
-
-#### EasyConnect 相关参数
-
-+ `totp-secret`: TOTP 密钥，可用于自动完成 TOTP 验证。如服务端无需 TOTP 验证或希望手动输入验证码，可不填
-
-+ `cert-file`: p12 证书文件路径，如果服务器要求证书验证，需要配置此参数
-
-+ `cert-password`: 证书密码
-
-+ `disable-server-config`: 禁用服务端配置，一般不需要加此参数
-
-+ `skip-domain-resource`: 不使用服务端下发的域名资源分流，一般不需要加此参数
-
-+ `disable-multi-line`: 禁用自动根据延时选择线路。加此参数后，使用 `server` 参数指定的线路
-
-+ `proxy-all`: 是否代理所有流量，一般不需要加此参数
-
-+ `custom-proxy-domain`: 指定自定义域名使用 RVPN 代理，格式为 `域名,域名,...`，例如 `nature.com,science.org`。多个域名用 `,` 分隔
-
-+ `twf-id`: twfID 登录，调试用途，一般不需要加此参数
-
-#### aTrust 相关参数
-
-+ `auth-type`: aTrust 登录验证类型，支持 `auth/psw`（密码验证）、`auth/cas`（CAS 验证）、`auth/smsCheckCode`（短信验证码验证），默认为空（尝试不验证）
-
-+ `login-domain`: 登录域，默认为 `Radius`
-
-+ `client-data-file`: 客户端数据文件路径，可用于保存登录状态，避免重复验证
-
-+ `cas-ticket`: CAS 验证票据，默认为空，此时进入交互式验证
-
-+ `phone`: 短信验证码登录时使用的手机号
-
-+ `update-best-nodes-interval`: 自动选择最优线路的更新间隔，单位为秒，默认为 `300` 秒。设置为 `0` 则禁用自动选择最优线路
-
-+ `auth-info`: 仅获取 aTrust 验证信息而不登录，一般不需要加此参数。可用于查看服务端支持的验证方式
-
-+ `trust-device`: 设置当前设备为授信终端（需要已登录的 `-client-data-file`），不启用隧道
-
-+ `untrust-device`: 从授信终端中移除当前设备（需要已登录的 `-client-data-file`），不启用隧道
-
-+ `sid`: aTrust SID，调试用途，一般不需要加此参数
-
-+ `device-id`: aTrust 设备 ID，调试用途，一般不需要加此参数
-
-+ `sign-key`: aTrust 签名密钥，调试用途，一般不需要加此参数
-
-+ `resource-file`: aTrust 资源文件，调试用途，一般不需要加此参数
-
-### 计划表
-
-#### 已完成
-
-- [x] 代理 TCP 流量
-- [x] 代理 UDP 流量
-- [x] SOCKS5 代理服务
-- [x] HTTP 代理服务
-- [x] Shadowsocks 代理服务
-- [x] 远端 DNS 解析
-- [x] ZJU 规则添加
-- [x] 支持 IPv6 直连
-- [x] DNS 缓存加速
-- [x] 自动选择线路
-- [x] TCP 端口转发功能
-- [x] UDP 端口转发功能
-- [x] 通过配置文件启动
-- [x] 定时保活
-- [x] TUN 模式
-- [x] 自动劫持 DNS
-- [x] 短信验证
-- [x] TOTP 验证
-- [x] 证书验证
-- [x] aTrust 协议支持
-- [x] Fake IP
-
-#### To Do
-
-### 贡献者
-
-<a href="https://github.com/mythologyli/zju-connect/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=mythologyli/zju-connect" />
-</a>
-
-### 感谢
-
-+ [EasierConnect](https://github.com/lyc8503/EasierConnect)
-
-+ [socks2http](https://github.com/zenhack/socks2http)
-
-+ [![image](docs/yxvm.png)](https://yxvm.com/)
-
-  [NodeSupport](https://github.com/NodeSeekDev/NodeSupport) 赞助了本项目
-
-### Star History
-
-[![Star History Chart](https://api.star-history.com/image?repos=mythologyli/zju-connect&type=date&legend=top-left)](https://www.star-history.com/?repos=mythologyli%2Fzju-connect&type=date&legend=bottom-right)
+auto_detect_interface = true
+keep_alive_url = "https://qz.sii.edu.cn/"
+sii_health_failure_threshold = 3
+sii_health_interval = 300
+sii_health_retry_interval = 2
+sii_health_timeout = 3
+
+skip_tcp_tunnel_wait = true
+tcp_tunnel_pool_size = 3
+socks_bind = "127.0.0.1:1080"
+http_bind = "127.0.0.1:8888"
+
+log_file = "/ABSOLUTE/PATH/TO/sii-link.log"
+log_max_size_mb = 5
+log_max_backups = 3
+```
+
+日志轮转按大小执行：活动文件达到上限后成为 `.1`，旧备份依次后移，超出
+`log_max_backups` 的最旧文件被删除。该边界不依赖外部 `logrotate` 或 launchd。
+
+## 构建和验证
+
+需要 Go 1.25.6 或兼容工具链：
+
+```bash
+go test ./...
+go vet ./...
+go build -trimpath -o sii-link .
+```
+
+正式 release 由 `scripts/build-release.sh` 生成。每个压缩包包含 AGPLv3、派生
+声明以及按目标二进制依赖闭包收集的第三方许可；缺少许可文件时构建会失败。
+当前依赖和许可类型见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 安全与隐私
+
+- `client-data.json` 含会话 cookie，应保持 `0600`，不要提交或分享。
+- 不要在配置文件、issue 或日志中放入密码、CAS ticket、SID、Device ID 或
+  Sign Key。
+- SII 无人值守模式只允许把凭据发送到固定的 SII HTTPS 端点，并启用系统 TLS
+  信任链验证。
+- 发现安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
+
+## 许可
+
+本项目及修改部分整体按 [GNU AGPLv3](LICENSE) 分发。发布二进制时必须同时
+提供对应版本的完整源代码和适用的第三方许可。版权归各自贡献者所有。

@@ -1,9 +1,9 @@
 package tcptunnel
 
 import (
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/ippool"
-	"github.com/mythologyli/zju-connect/internal/zcdns"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/ippool"
+	"github.com/hopecommon/sii-link/internal/zcdns"
 )
 
 type Stack struct {

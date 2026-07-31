@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 // TCPing ...
@@ -48,36 +48,46 @@ func (tcping TCPing) Result() *Result {
 // Start a tcping
 func (tcping TCPing) Start() <-chan struct{} {
 	go func() {
+		runProbe := func() {
+			duration, remoteAddr, err := tcping.ping()
+			tcping.result.Counter++
+
+			if err != nil {
+				log.DebugPrintf("Ping %s - failed: %s\n", tcping.target, err)
+				return
+			}
+			log.DebugPrintf("Ping %s(%s) - Connected - time=%s\n", tcping.target, remoteAddr, duration)
+
+			if tcping.result.MinDuration == 0 {
+				tcping.result.MinDuration = duration
+			}
+			if tcping.result.MaxDuration == 0 {
+				tcping.result.MaxDuration = duration
+			}
+			tcping.result.SuccessCounter++
+			if duration > tcping.result.MaxDuration {
+				tcping.result.MaxDuration = duration
+			} else if duration < tcping.result.MinDuration {
+				tcping.result.MinDuration = duration
+			}
+			tcping.result.TotalDuration += duration
+		}
+
+		runProbe()
+		if tcping.target.Counter != 0 && tcping.result.Counter >= tcping.target.Counter {
+			tcping.Stop()
+			return
+		}
+
 		t := time.NewTicker(tcping.target.Interval)
 		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
-				if tcping.result.Counter >= tcping.target.Counter && tcping.target.Counter != 0 {
+				runProbe()
+				if tcping.target.Counter != 0 && tcping.result.Counter >= tcping.target.Counter {
 					tcping.Stop()
 					return
-				}
-				duration, remoteAddr, err := tcping.ping()
-				tcping.result.Counter++
-
-				if err != nil {
-					log.DebugPrintf("Ping %s - failed: %s\n", tcping.target, err)
-				} else {
-					log.DebugPrintf("Ping %s(%s) - Connected - time=%s\n", tcping.target, remoteAddr, duration)
-
-					if tcping.result.MinDuration == 0 {
-						tcping.result.MinDuration = duration
-					}
-					if tcping.result.MaxDuration == 0 {
-						tcping.result.MaxDuration = duration
-					}
-					tcping.result.SuccessCounter++
-					if duration > tcping.result.MaxDuration {
-						tcping.result.MaxDuration = duration
-					} else if duration < tcping.result.MinDuration {
-						tcping.result.MinDuration = duration
-					}
-					tcping.result.TotalDuration += duration
 				}
 			case <-tcping.done:
 				return

@@ -9,8 +9,8 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/mythologyli/zju-connect/configs"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/configs"
+	"github.com/hopecommon/sii-link/log"
 )
 
 // get all services and skip element contains "*"

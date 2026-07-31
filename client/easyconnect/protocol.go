@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 	"github.com/refraction-networking/utls"
 )
 
@@ -121,7 +121,7 @@ func (c *Client) RecvConn() (*tls.UConn, error) {
 // The first byte of the server reply is a HandCmdMsg cmd code, dispatched
 // by upstream sangfor's svpnservice. Known values:
 //
-//	0x00 = SEND_IP  (zju-connect protocol uses 0x02 here as its OK marker;
+//	0x00 = SEND_IP  (the upstream protocol uses 0x02 here as its OK marker;
 //	                 the relationship between 0x02 and the full sangfor
 //	                 cmd table isn't fully understood, but accepting it
 //	                 has worked reliably for years)

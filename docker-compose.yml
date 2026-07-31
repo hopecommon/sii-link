@@ -1,11 +1,11 @@
 version: '3'
 
 services:
-  zju-connect:
+  sii-link:
     build:
       context: .
-    image: zju-connect
-    container_name: zju-connect
+    image: sii-link
+    container_name: sii-link
     restart: unless-stopped
     ports:
       - 1080:1080

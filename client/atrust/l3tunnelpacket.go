@@ -7,9 +7,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/zctcpip"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/zctcpip"
+	"github.com/hopecommon/sii-link/log"
 )
 
 func (t *L3Tunnel) processIPV4(packet zctcpip.IPv4Packet) error {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"os/user"
 
-	"github.com/mythologyli/zju-connect/configs"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/configs"
+	"github.com/hopecommon/sii-link/log"
 )
 
 func init() {

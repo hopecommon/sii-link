@@ -31,6 +31,9 @@ type (
 		FakeIP              bool
 		GraphCodeFile       string
 		DebugDump           bool
+		LogFile             string
+		LogMaxSizeMB        int
+		LogMaxBackups       int
 		BindInterface       string
 		AutoDetectInterface bool
 
@@ -58,6 +61,17 @@ type (
 		ResourceFile            string
 		UpdateBestNodesInterval int
 		SkipTCPTunnelWait       bool
+		TCPTunnelPoolSize       int
+
+		SIIUnattendedCAS   bool
+		SIIKeychainAccount string
+		SIIUsernameFile    string
+		SIIPasswordFile    string
+		SIICASProxy        string
+		SIIHealthFailures  int
+		SIIHealthInterval  int
+		SIIHealthRetry     int
+		SIIHealthTimeout   int
 	}
 
 	SinglePortForwarding struct {
@@ -107,6 +121,9 @@ type (
 		FakeIP                  *bool                      `toml:"fake_ip"`
 		GraphCodeFile           *string                    `toml:"graph_code_file"`
 		DebugDump               *bool                      `toml:"debug_dump"`
+		LogFile                 *string                    `toml:"log_file"`
+		LogMaxSizeMB            *int                       `toml:"log_max_size_mb"`
+		LogMaxBackups           *int                       `toml:"log_max_backups"`
 		PortForwarding          []SinglePortForwardingTOML `toml:"port_forwarding"`
 		CustomDNS               []SingleCustomDNSTOML      `toml:"custom_dns"`
 		CustomProxyDomain       []string                   `toml:"custom_proxy_domain"`
@@ -122,8 +139,19 @@ type (
 		ResourceFile            *string                    `toml:"resource_file"`
 		UpdateBestNodesInterval *int                       `toml:"update_best_nodes_interval"`
 		SkipTCPTunnelWait       *bool                      `toml:"skip_tcp_tunnel_wait"`
+		TCPTunnelPoolSize       *int                       `toml:"tcp_tunnel_pool_size"`
 		BindInterface           *string                    `toml:"bind_interface"`
 		AutoDetectInterface     *bool                      `toml:"auto_detect_interface"`
+
+		SIIUnattendedCAS   *bool   `toml:"sii_unattended_cas"`
+		SIIKeychainAccount *string `toml:"sii_keychain_account"`
+		SIIUsernameFile    *string `toml:"sii_username_file"`
+		SIIPasswordFile    *string `toml:"sii_password_file"`
+		SIICASProxy        *string `toml:"sii_cas_proxy"`
+		SIIHealthFailures  *int    `toml:"sii_health_failure_threshold"`
+		SIIHealthInterval  *int    `toml:"sii_health_interval"`
+		SIIHealthRetry     *int    `toml:"sii_health_retry_interval"`
+		SIIHealthTimeout   *int    `toml:"sii_health_timeout"`
 	}
 
 	SinglePortForwardingTOML struct {

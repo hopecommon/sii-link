@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 type TerminalFunc func(ctx context.Context) error

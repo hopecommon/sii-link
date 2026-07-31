@@ -1,0 +1,26 @@
+protocol = "atrust"
+server_address = "vpn.sii.edu.cn"
+server_port = 443
+auth_type = "auth/cas"
+login_domain = "cas.sii.edu.cn"
+
+sii_unattended_cas = true
+sii_keychain_account = "YOUR_MACOS_ACCOUNT"
+sii_cas_proxy = "http://127.0.0.1:7890"
+sii_health_failure_threshold = 3
+sii_health_interval = 300
+sii_health_retry_interval = 2
+sii_health_timeout = 3
+
+client_data_file = "/ABSOLUTE/PATH/TO/sii-canary/client-data.json"
+auto_detect_interface = true
+keep_alive_url = "https://qz.sii.edu.cn/"
+
+# Match the official client's three reusable short-tunnel transports and
+# overlap proxy connection setup with the first application packet.
+tcp_tunnel_pool_size = 3
+skip_tcp_tunnel_wait = true
+
+# Canary ports do not conflict with the existing Docker service.
+socks_bind = "127.0.0.1:1082"
+http_bind = "127.0.0.1:8890"

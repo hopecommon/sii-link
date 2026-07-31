@@ -6,27 +6,32 @@ import (
 	"context"
 	"crypto"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/containers/winquit/pkg/winquit"
-	"github.com/mythologyli/zju-connect/client"
-	atrustclient "github.com/mythologyli/zju-connect/client/atrust"
-	easyconnectclient "github.com/mythologyli/zju-connect/client/easyconnect"
-	"github.com/mythologyli/zju-connect/configs"
-	"github.com/mythologyli/zju-connect/dial"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/log"
-	"github.com/mythologyli/zju-connect/resolve"
-	"github.com/mythologyli/zju-connect/service"
-	"github.com/mythologyli/zju-connect/stack"
-	"github.com/mythologyli/zju-connect/stack/gvisor"
-	"github.com/mythologyli/zju-connect/stack/tcptunnel"
-	"github.com/mythologyli/zju-connect/stack/tun"
+	"github.com/hopecommon/sii-link/client"
+	atrustclient "github.com/hopecommon/sii-link/client/atrust"
+	easyconnectclient "github.com/hopecommon/sii-link/client/easyconnect"
+	"github.com/hopecommon/sii-link/configs"
+	"github.com/hopecommon/sii-link/dial"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/internal/powerevent"
+	"github.com/hopecommon/sii-link/internal/securefile"
+	"github.com/hopecommon/sii-link/log"
+	"github.com/hopecommon/sii-link/resolve"
+	"github.com/hopecommon/sii-link/service"
+	"github.com/hopecommon/sii-link/stack"
+	"github.com/hopecommon/sii-link/stack/gvisor"
+	"github.com/hopecommon/sii-link/stack/tcptunnel"
+	"github.com/hopecommon/sii-link/stack/tun"
 	"golang.org/x/crypto/pkcs12"
 	"inet.af/netaddr"
 )
@@ -35,15 +40,27 @@ var conf configs.Config
 
 func main() {
 	log.Init()
+	if conf.LogFile != "" {
+		logCloser, err := log.ConfigureFile(conf.LogFile, int64(conf.LogMaxSizeMB)*1024*1024, conf.LogMaxBackups)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Configure rotating log: %s\n", err)
+			os.Exit(1)
+		}
+		defer func() {
+			if err := logCloser.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "Close rotating log: %s\n", err)
+			}
+		}()
+	}
 
-	log.Println("Start ZJU Connect " + zjuConnectVersionString())
+	log.Println("Start SII Link " + siiLinkVersionString())
 	if conf.DebugDump {
 		log.EnableDebug()
 	}
 
 	if errs := hook_func.ExecInitialFunc(context.Background(), conf); errs != nil {
 		for _, err := range errs {
-			log.Printf("Initial ZJU-Connect failed: %s", err)
+			log.Printf("Initial SII Link failed: %s", err)
 		}
 		os.Exit(1)
 	}
@@ -102,13 +119,24 @@ func main() {
 		if conf.ClientDataFile != "" {
 			clientData, err = os.ReadFile(conf.ClientDataFile)
 			if err != nil {
-				log.Printf("Read client data file error: %s", err)
-				log.Println("Will create a new client data file if log in successfully")
+				if !errors.Is(err, os.ErrNotExist) {
+					log.Fatalf("Read client data file error: %s", err)
+				}
+				log.Println("Client data file does not exist; it will be created after login")
 			}
 		}
 
 		vpnClient = atrustclient.NewClient(conf.Username, conf.SID, conf.DeviceID, conf.SignKey)
 		vpnClient.(*atrustclient.Client).SetSkipTCPTunnelWait(conf.SkipTCPTunnelWait)
+		if err := vpnClient.(*atrustclient.Client).SetTCPTunnelPoolSize(conf.TCPTunnelPoolSize); err != nil {
+			log.Fatalf("Configure aTrust TCP tunnel pool error: %s", err)
+		}
+		vpnClient.(*atrustclient.Client).SetVerifyServerTLS(conf.SIIUnattendedCAS)
+		casTicketProvider, err := buildSIICASTicketProvider(conf)
+		if err != nil {
+			log.Fatalf("Configure SII unattended CAS error: %s", err)
+		}
+		vpnClient.(*atrustclient.Client).SetCASTicketProvider(casTicketProvider)
 
 		log.Printf("VPN protocol: %s", conf.Protocol)
 		clientData, err = vpnClient.(*atrustclient.Client).Setup(
@@ -133,7 +161,7 @@ func main() {
 		}
 
 		if conf.ClientDataFile != "" {
-			err = os.WriteFile(conf.ClientDataFile, clientData, 0644)
+			err = securefile.Write(conf.ClientDataFile, clientData)
 			if err != nil {
 				log.Fatalf("Write client data file error: %s", err)
 			}
@@ -333,6 +361,13 @@ func main() {
 		}
 	}
 
+	runtimeFailure := make(chan error, 1)
+	var runtimeFailureOnce sync.Once
+	reportRuntimeFailure := func(err error) {
+		runtimeFailureOnce.Do(func() {
+			runtimeFailure <- err
+		})
+	}
 	if !conf.DisableKeepAlive {
 		if conf.KeepAliveURL == "" && !useRemoteDNS {
 			log.Println("Keep alive is disabled because remote DNS is disabled, and no KeepAliveURL is provided")
@@ -342,26 +377,96 @@ func main() {
 				keepAliveCancel()
 				return nil
 			})
-			go service.KeepAlive(keepAliveCtx, vpnResolver, vpnDialer, conf.KeepAliveURL)
+			failureThreshold := 0
+			keepAliveOptions := service.KeepAliveOptions{
+				Interval:             60 * time.Second,
+				FailureRetryInterval: 60 * time.Second,
+				CheckTimeout:         20 * time.Second,
+			}
+			if conf.SIIUnattendedCAS {
+				failureThreshold = conf.SIIHealthFailures
+				keepAliveOptions.Interval = time.Duration(conf.SIIHealthInterval) * time.Second
+				keepAliveOptions.FailureRetryInterval = time.Duration(conf.SIIHealthRetry) * time.Second
+				keepAliveOptions.CheckTimeout = time.Duration(conf.SIIHealthTimeout) * time.Second
+				if runtime.GOOS == "darwin" {
+					watcher, err := powerevent.Watch(keepAliveCtx)
+					if err != nil {
+						log.Fatalf("Configure macOS wake-event monitoring error: %s", err)
+					}
+					wakeTrigger := make(chan struct{}, 1)
+					keepAliveOptions.Trigger = wakeTrigger
+					go func() {
+						for {
+							select {
+							case <-keepAliveCtx.Done():
+								return
+							case _, ok := <-watcher.Events:
+								if !ok {
+									return
+								}
+								log.Println("macOS wake event detected; running an immediate VPN health check")
+								select {
+								case wakeTrigger <- struct{}{}:
+								default:
+								}
+							}
+						}
+					}()
+					go func() {
+						if err, ok := <-watcher.Done; ok && err != nil {
+							if keepAliveCtx.Err() != nil {
+								log.Printf("Stop macOS wake-event monitoring: %s", err)
+								return
+							}
+							reportRuntimeFailure(fmt.Errorf("macOS wake-event monitor: %w", err))
+						}
+					}()
+				}
+			}
+			keepAliveOptions.FailureThreshold = failureThreshold
+			go func() {
+				err := service.KeepAlive(keepAliveCtx, vpnResolver, vpnDialer, conf.KeepAliveURL, keepAliveOptions)
+				if err == nil {
+					return
+				}
+				if failureThreshold > 0 {
+					reportRuntimeFailure(fmt.Errorf("VPN health monitor: %w", err))
+				} else {
+					log.Printf("KeepAlive stopped: %s", err)
+				}
+			}()
 		}
 	}
 
+	var runtimeErr error
 	if runtime.GOOS == "windows" {
 		done := make(chan os.Signal, 1)
 		signal.Notify(done, syscall.SIGINT)
 		winquit.SimulateSigTermOnQuit(done)
-		<-done
+		select {
+		case <-done:
+		case runtimeErr = <-runtimeFailure:
+		}
 	} else {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-		<-quit
+		select {
+		case <-quit:
+		case runtimeErr = <-runtimeFailure:
+		}
 	}
-	log.Println("Shutdown ZJU-Connect ......")
+	if runtimeErr != nil {
+		log.Printf("Runtime failure requires process restart: %s", runtimeErr)
+	}
+	log.Println("Shutdown SII Link ......")
 	if errs := hook_func.ExecTerminalFunc(context.Background()); errs != nil {
 		for _, err := range errs {
-			log.Printf("Shutdown ZJU-Connect failed: %s", err)
+			log.Printf("Shutdown SII Link failed: %s", err)
 		}
 	} else {
-		log.Println("Shutdown ZJU-Connect success, Bye~")
+		log.Println("Shutdown SII Link success, Bye~")
+	}
+	if runtimeErr != nil {
+		os.Exit(1)
 	}
 }

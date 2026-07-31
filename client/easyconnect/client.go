@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mythologyli/zju-connect/client"
-	"github.com/mythologyli/zju-connect/internal/hook_func"
-	"github.com/mythologyli/zju-connect/internal/underlay"
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/client"
+	"github.com/hopecommon/sii-link/internal/hook_func"
+	"github.com/hopecommon/sii-link/internal/underlay"
+	"github.com/hopecommon/sii-link/log"
 	"inet.af/netaddr"
 )
 

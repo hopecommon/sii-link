@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
 const (
@@ -95,6 +95,11 @@ func NewSession(server string, dialContext ...func(context.Context, string, stri
 		rid:      rid,
 		response: make(map[string]json.RawMessage),
 	}
+}
+
+func (s *Session) RequireVerifiedTLS() {
+	transport := s.client.Transport.(*http.Transport)
+	transport.TLSClientConfig.InsecureSkipVerify = false
 }
 
 type AuthInfo struct {

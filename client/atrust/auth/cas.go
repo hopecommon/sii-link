@@ -1,17 +1,34 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 
-	"github.com/mythologyli/zju-connect/log"
+	"github.com/hopecommon/sii-link/log"
 )
 
+type CASTicketRequest struct {
+	LoginURL    string
+	CallbackURL string
+}
+
+type CASTicketProvider interface {
+	Ticket(context.Context, CASTicketRequest) (string, error)
+}
+
+type CASTicketProviderFunc func(context.Context, CASTicketRequest) (string, error)
+
+func (f CASTicketProviderFunc) Ticket(ctx context.Context, request CASTicketRequest) (string, error) {
+	return f(ctx, request)
+}
+
 type CASLogin struct {
-	Domain string
-	Ticket string
+	Domain         string
+	Ticket         string
+	TicketProvider CASTicketProvider
 }
 
 func (m CASLogin) AuthType() string {
@@ -23,16 +40,34 @@ func (m CASLogin) LoginDomain() string {
 }
 
 func (m CASLogin) login(s *Session, authInfo AuthInfo) error {
-	return s.loginAuthCas(authInfo.LoginURL, m.Domain, m.Ticket)
+	return s.loginAuthCas(authInfo.LoginURL, m.Domain, m.Ticket, m.TicketProvider)
 }
 
-func (s *Session) loginAuthCas(loginURL, loginDomain, ticket string) error {
+func (s *Session) loginAuthCas(loginURL, loginDomain, ticket string, provider CASTicketProvider) error {
 	callback := s.casCallbackFromTicket(loginDomain, ticket)
 	if ticket == "" {
-		var err error
-		callback, err = s.interactiveCas(loginURL)
+		resolvedLoginURL, err := s.resolveURL(loginURL)
 		if err != nil {
-			return err
+			return fmt.Errorf("resolve CAS login URL: %w", err)
+		}
+
+		if provider != nil {
+			ticket, err = provider.Ticket(context.Background(), CASTicketRequest{
+				LoginURL:    resolvedLoginURL,
+				CallbackURL: s.casCallbackURL(loginDomain),
+			})
+			if err != nil {
+				return fmt.Errorf("get CAS ticket: %w", err)
+			}
+			if ticket == "" {
+				return fmt.Errorf("CAS ticket provider returned an empty ticket")
+			}
+			callback = s.casCallbackFromTicket(loginDomain, ticket)
+		} else {
+			callback, err = s.interactiveCas(resolvedLoginURL)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -43,12 +78,31 @@ func (s *Session) loginAuthCas(loginURL, loginDomain, ticket string) error {
 	return err
 }
 
+func (s *Session) casCallbackURL(loginDomain string) string {
+	params := url.Values{
+		"sfDomain": {loginDomain},
+	}
+	return s.baseURL + "/passport/v1/auth/cas?" + params.Encode()
+}
+
 func (s *Session) casCallbackFromTicket(loginDomain, ticket string) string {
 	params := url.Values{
 		"sfDomain": {loginDomain},
 		"ticket":   {ticket},
 	}
 	return s.baseURL + "/passport/v1/auth/cas?" + params.Encode()
+}
+
+func (s *Session) resolveURL(rawURL string) (string, error) {
+	baseURL, err := url.Parse(s.baseURL)
+	if err != nil {
+		return "", err
+	}
+	reference, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	return baseURL.ResolveReference(reference).String(), nil
 }
 
 func (s *Session) interactiveCas(loginURL string) (string, error) {
