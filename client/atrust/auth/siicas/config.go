@@ -14,6 +14,7 @@ type Config struct {
 	AuthType               string
 	LoginDomain            string
 	StaticTicket           string
+	CredentialSource       string
 	KeychainAccount        string
 	UsernameFile           string
 	PasswordFile           string
@@ -27,6 +28,12 @@ type Config struct {
 	HealthRetryInterval    int
 	HealthTimeout          int
 }
+
+const (
+	CredentialSourceKeychain      = "keychain"
+	CredentialSourceFile          = "file"
+	CredentialSourceKernelKeyring = "kernel-keyring"
+)
 
 func NewConfiguredProvider(config Config) (auth.CASTicketProvider, error) {
 	if !config.Enabled {
@@ -50,6 +57,12 @@ func NewConfiguredProvider(config Config) (auth.CASTicketProvider, error) {
 	if (config.UsernameFile == "") != (config.PasswordFile == "") {
 		return nil, fmt.Errorf("SII unattended CAS requires both username and password files, or neither")
 	}
+	if config.CredentialSource != "" && config.CredentialSource != CredentialSourceFile && (config.UsernameFile != "" || config.PasswordFile != "") {
+		return nil, fmt.Errorf("SII credential source %q cannot be combined with credential files", config.CredentialSource)
+	}
+	if config.CredentialSource != "" && config.CredentialSource != CredentialSourceKeychain && config.KeychainAccount != "" {
+		return nil, fmt.Errorf("SII credential source %q cannot be combined with a Keychain account", config.CredentialSource)
+	}
 	if config.BindInterface == "" && !config.AutoDetectInterface {
 		return nil, fmt.Errorf("SII unattended CAS requires a bound or auto-detected underlay interface")
 	}
@@ -69,14 +82,34 @@ func NewConfiguredProvider(config Config) (auth.CASTicketProvider, error) {
 		return nil, fmt.Errorf("SII health-triggered restart requires an HTTP keep-alive URL")
 	}
 
+	credentialSource := config.CredentialSource
+	if credentialSource == "" {
+		if config.UsernameFile != "" {
+			credentialSource = CredentialSourceFile
+		} else {
+			credentialSource = CredentialSourceKeychain
+		}
+	}
+
 	var credentials CredentialSource
-	if config.UsernameFile != "" {
+	switch credentialSource {
+	case CredentialSourceFile:
+		if config.UsernameFile == "" || config.PasswordFile == "" {
+			return nil, fmt.Errorf("SII file credential source requires both username and password files")
+		}
 		credentials = FileCredentialSource{
 			UsernameFile: config.UsernameFile,
 			PasswordFile: config.PasswordFile,
 		}
-	} else {
+	case CredentialSourceKeychain:
 		credentials = KeychainCredentialSource{Account: config.KeychainAccount}
+	case CredentialSourceKernelKeyring:
+		if !KernelKeyringSupported() {
+			return nil, fmt.Errorf("SII kernel-keyring credential source is only supported on Linux")
+		}
+		credentials = NewKeyringCredentialStore()
+	default:
+		return nil, fmt.Errorf("unsupported SII credential source %q", credentialSource)
 	}
 	provider, err := NewProvider(credentials, Options{
 		CASHost:  config.LoginDomain,

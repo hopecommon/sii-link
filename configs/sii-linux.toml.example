@@ -1,0 +1,24 @@
+protocol = "atrust"
+server_address = "vpn.sii.edu.cn"
+server_port = 443
+auth_type = "auth/cas"
+login_domain = "cas.sii.edu.cn"
+
+sii_unattended_cas = true
+sii_credential_source = "kernel-keyring"
+sii_health_failure_threshold = 3
+sii_health_interval = 300
+sii_health_retry_interval = 2
+sii_health_timeout = 3
+
+client_data_file = "/ABSOLUTE/PATH/TO/client-data.json"
+auto_detect_interface = true
+keep_alive_url = "https://qz.sii.edu.cn/"
+skip_tcp_tunnel_wait = true
+tcp_tunnel_pool_size = 3
+
+socks_bind = "127.0.0.1:1080"
+http_bind = "127.0.0.1:8888"
+log_file = "/ABSOLUTE/PATH/TO/sii-link.log"
+log_max_size_mb = 5
+log_max_backups = 3

@@ -14,6 +14,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/hopecommon/sii-link/client/atrust"
 	"github.com/hopecommon/sii-link/configs"
+	"github.com/hopecommon/sii-link/internal/credentialcli"
 )
 
 var (
@@ -96,6 +97,7 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 	conf.SkipTCPTunnelWait = getTOMLVal(confTOML.SkipTCPTunnelWait, false)
 	conf.TCPTunnelPoolSize = getTOMLVal(confTOML.TCPTunnelPoolSize, 0)
 	conf.SIIUnattendedCAS = getTOMLVal(confTOML.SIIUnattendedCAS, false)
+	conf.SIICredentialSource = getTOMLVal(confTOML.SIICredentialSource, "")
 	conf.SIIKeychainAccount = getTOMLVal(confTOML.SIIKeychainAccount, "")
 	conf.SIIUsernameFile = getTOMLVal(confTOML.SIIUsernameFile, "")
 	conf.SIIPasswordFile = getTOMLVal(confTOML.SIIPasswordFile, "")
@@ -160,6 +162,15 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 }
 
 func init() {
+	if len(os.Args) > 1 && os.Args[1] == "credentials" {
+		os.Exit(credentialcli.Run(
+			os.Args[2:],
+			os.Stdin,
+			os.Stdout,
+			os.Stderr,
+		))
+	}
+
 	configFile, tcpPortForwarding, udpPortForwarding, customDns, customProxyDomain := "", "", "", "", ""
 	showVersion := false
 	atrustAuthInfo := false
@@ -219,6 +230,7 @@ func init() {
 	flag.BoolVar(&conf.SkipTCPTunnelWait, "skip-tcp-tunnel-wait", false, "Don't wait for aTrust TCP tunnel connection status")
 	flag.IntVar(&conf.TCPTunnelPoolSize, "tcp-tunnel-pool-size", 0, "Maximum reusable aTrust TCP tunnel transports per relay")
 	flag.BoolVar(&conf.SIIUnattendedCAS, "sii-unattended-cas", false, "Enable unattended CAS authentication for vpn.sii.edu.cn")
+	flag.StringVar(&conf.SIICredentialSource, "sii-credential-source", "", "SII CAS credential source (keychain, file, kernel-keyring)")
 	flag.StringVar(&conf.SIIKeychainAccount, "sii-keychain-account", "", "macOS Keychain account for SII CAS credentials")
 	flag.StringVar(&conf.SIIUsernameFile, "sii-username-file", "", "Private file containing the SII CAS username")
 	flag.StringVar(&conf.SIIPasswordFile, "sii-password-file", "", "Private file containing the SII CAS password")

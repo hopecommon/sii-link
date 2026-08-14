@@ -4,7 +4,7 @@ English | [中文](README.md)
 
 SII Link is a lightweight command-line client for SII aTrust deployments. It
 runs as a native Go binary and provides local SOCKS5/HTTP proxies, unattended
-CAS authentication, macOS Keychain credential loading, event-driven wake
+CAS authentication, macOS Keychain and Linux kernel-keyring credential loading, event-driven wake
 recovery, and bounded log rotation. It is intended for users who do not want to
 keep a full Docker environment running for one VPN connection.
 
@@ -25,6 +25,8 @@ modification dates, and third-party notices.
   the normal local-proxy setup.
 - Renew SII CAS sessions from macOS Keychain without persisting the static
   password in TOML, state, or logs.
+- Run each Linux host as an independent SII data plane after provisioning its
+  CAS credentials into the kernel keyring; no Mac traffic relay is required.
 - Check immediately after a macOS wake event while keeping idle checks
   infrequent instead of polling every 15 seconds.
 - Reduce repeated aTrust TLS setup with an optional short-tunnel transport pool
@@ -78,6 +80,33 @@ The service starts after graphical login, not before FileVault login. If the
 CAS cookie has expired, the first background Keychain access may require user
 approval.
 
+## Quick start on Linux
+
+Copy the [Linux configuration example](configs/sii-linux.toml.example) and set
+real state and log paths. The production Linux config selects a credential
+source without containing a username or password:
+
+```toml
+sii_unattended_cas = true
+sii_credential_source = "kernel-keyring"
+```
+
+The provisioning interface reads one JSON object exclusively from stdin. Use
+a trusted helper that does not expand the secret through a shell; never place
+the password in argv, environment variables, or shell history:
+
+```text
+sii-link credentials put [--ttl 8h]
+sii-link credentials status
+sii-link credentials revoke
+```
+
+Credentials have no TTL by default and remain until explicit revocation,
+kernel cleanup, or reboot. `--ttl` is only for temporary hosts. Kernel-keyring
+storage is not written to disk, but it cannot isolate credentials from root or
+another process with the same UID. Do not provision personal credentials into
+a shared-root account.
+
 ## Ports and compatibility
 
 The production SII profile keeps the existing local contract:
@@ -108,6 +137,7 @@ auth_type = "auth/cas"
 login_domain = "cas.sii.edu.cn"
 
 sii_unattended_cas = true
+sii_credential_source = "keychain"
 sii_keychain_account = "YOUR_MACOS_ACCOUNT"
 client_data_file = "/ABSOLUTE/PATH/TO/client-data.json"
 
@@ -151,6 +181,9 @@ See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the current inventory.
 
 - `client-data.json` contains session cookies. Keep it at mode `0600` and never
   commit or share it.
+- Linux kernel-keyring credentials have no default TTL but do not survive a
+  reboot. Provision them again from a trusted host when needed. They do not
+  isolate root or processes running under the same UID.
 - Never put passwords, CAS tickets, SIDs, device IDs, or sign keys in configs,
   issues, or logs.
 - Unattended SII mode only sends credentials to the fixed SII HTTPS endpoints

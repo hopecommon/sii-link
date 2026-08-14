@@ -63,15 +63,16 @@ type (
 		SkipTCPTunnelWait       bool
 		TCPTunnelPoolSize       int
 
-		SIIUnattendedCAS   bool
-		SIIKeychainAccount string
-		SIIUsernameFile    string
-		SIIPasswordFile    string
-		SIICASProxy        string
-		SIIHealthFailures  int
-		SIIHealthInterval  int
-		SIIHealthRetry     int
-		SIIHealthTimeout   int
+		SIIUnattendedCAS    bool
+		SIICredentialSource string
+		SIIKeychainAccount  string
+		SIIUsernameFile     string
+		SIIPasswordFile     string
+		SIICASProxy         string
+		SIIHealthFailures   int
+		SIIHealthInterval   int
+		SIIHealthRetry      int
+		SIIHealthTimeout    int
 	}
 
 	SinglePortForwarding struct {
@@ -143,15 +144,16 @@ type (
 		BindInterface           *string                    `toml:"bind_interface"`
 		AutoDetectInterface     *bool                      `toml:"auto_detect_interface"`
 
-		SIIUnattendedCAS   *bool   `toml:"sii_unattended_cas"`
-		SIIKeychainAccount *string `toml:"sii_keychain_account"`
-		SIIUsernameFile    *string `toml:"sii_username_file"`
-		SIIPasswordFile    *string `toml:"sii_password_file"`
-		SIICASProxy        *string `toml:"sii_cas_proxy"`
-		SIIHealthFailures  *int    `toml:"sii_health_failure_threshold"`
-		SIIHealthInterval  *int    `toml:"sii_health_interval"`
-		SIIHealthRetry     *int    `toml:"sii_health_retry_interval"`
-		SIIHealthTimeout   *int    `toml:"sii_health_timeout"`
+		SIIUnattendedCAS    *bool   `toml:"sii_unattended_cas"`
+		SIICredentialSource *string `toml:"sii_credential_source"`
+		SIIKeychainAccount  *string `toml:"sii_keychain_account"`
+		SIIUsernameFile     *string `toml:"sii_username_file"`
+		SIIPasswordFile     *string `toml:"sii_password_file"`
+		SIICASProxy         *string `toml:"sii_cas_proxy"`
+		SIIHealthFailures   *int    `toml:"sii_health_failure_threshold"`
+		SIIHealthInterval   *int    `toml:"sii_health_interval"`
+		SIIHealthRetry      *int    `toml:"sii_health_retry_interval"`
+		SIIHealthTimeout    *int    `toml:"sii_health_timeout"`
 	}
 
 	SinglePortForwardingTOML struct {

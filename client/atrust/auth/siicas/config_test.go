@@ -1,6 +1,7 @@
 package siicas
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -57,6 +58,37 @@ func TestNewConfiguredProviderUsesKeychainByDefault(t *testing.T) {
 	}
 	if provider == nil {
 		t.Fatal("provider is nil")
+	}
+}
+
+func TestNewConfiguredProviderAcceptsExplicitKernelKeyringSource(t *testing.T) {
+	config := validConfig()
+	config.CredentialSource = CredentialSourceKernelKeyring
+
+	provider, err := NewConfiguredProvider(config)
+	if runtime.GOOS != "linux" {
+		if err == nil || !strings.Contains(err.Error(), "only supported on Linux") {
+			t.Fatalf("provider error = %v, want unsupported-platform error", err)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("build provider: %v", err)
+	}
+	if provider == nil {
+		t.Fatal("provider is nil")
+	}
+}
+
+func TestNewConfiguredProviderRejectsMixedCredentialSources(t *testing.T) {
+	config := validConfig()
+	config.CredentialSource = CredentialSourceKernelKeyring
+	config.UsernameFile = "/private/username"
+	config.PasswordFile = "/private/password"
+
+	_, err := NewConfiguredProvider(config)
+	if err == nil || !strings.Contains(err.Error(), "cannot be combined") {
+		t.Fatalf("provider error = %v, want mixed-source error", err)
 	}
 }
 

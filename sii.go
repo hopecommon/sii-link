@@ -17,6 +17,7 @@ func buildSIICASTicketProvider(config configs.Config) (auth.CASTicketProvider, e
 		AuthType:               config.AuthType,
 		LoginDomain:            config.LoginDomain,
 		StaticTicket:           config.CasTicket,
+		CredentialSource:       config.SIICredentialSource,
 		KeychainAccount:        config.SIIKeychainAccount,
 		UsernameFile:           config.SIIUsernameFile,
 		PasswordFile:           config.SIIPasswordFile,

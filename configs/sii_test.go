@@ -9,6 +9,7 @@ import (
 func TestConfigTOMLDecodesSIISettings(t *testing.T) {
 	contents := `
 sii_unattended_cas = true
+sii_credential_source = "kernel-keyring"
 sii_keychain_account = "local-user"
 sii_username_file = "/private/username"
 sii_password_file = "/private/password"
@@ -28,6 +29,9 @@ log_max_backups = 3
 	}
 	if parsed.SIIUnattendedCAS == nil || !*parsed.SIIUnattendedCAS {
 		t.Fatal("sii_unattended_cas was not decoded")
+	}
+	if parsed.SIICredentialSource == nil || *parsed.SIICredentialSource != "kernel-keyring" {
+		t.Fatal("sii_credential_source was not decoded")
 	}
 	if parsed.SIIKeychainAccount == nil || *parsed.SIIKeychainAccount != "local-user" {
 		t.Fatal("sii_keychain_account was not decoded")
@@ -64,6 +68,26 @@ log_max_backups = 3
 	}
 	if parsed.LogMaxBackups == nil || *parsed.LogMaxBackups != 3 {
 		t.Fatal("log_max_backups was not decoded")
+	}
+}
+
+func TestSIILinuxExampleUsesKernelKeyring(t *testing.T) {
+	var parsed ConfigTOML
+	metadata, err := toml.DecodeFile("sii-linux.toml.example", &parsed)
+	if err != nil {
+		t.Fatalf("decode SII Linux example: %v", err)
+	}
+	if undecoded := metadata.Undecoded(); len(undecoded) != 0 {
+		t.Fatalf("unknown SII Linux settings: %v", undecoded)
+	}
+	if parsed.SIIUnattendedCAS == nil || !*parsed.SIIUnattendedCAS {
+		t.Fatal("SII Linux example does not enable unattended CAS")
+	}
+	if parsed.SIICredentialSource == nil || *parsed.SIICredentialSource != "kernel-keyring" {
+		t.Fatal("SII Linux example does not use the Linux kernel keyring")
+	}
+	if parsed.SIIUsernameFile != nil || parsed.SIIPasswordFile != nil {
+		t.Fatal("SII Linux example must not configure credential files")
 	}
 }
 
