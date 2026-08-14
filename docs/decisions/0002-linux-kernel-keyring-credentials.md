@@ -38,6 +38,11 @@ The existing `CredentialSource` seam owns all credential lookup. Linux adds a
 kernel-keyring adapter; CAS protocol and ticket construction do not learn
 about provisioning or storage.
 
+`credentials status` returns exit code 0 when credentials are available and
+exit code 3 when they are absent, while emitting the same non-secret JSON in
+both cases. This gives service managers a stable readiness condition without
+parsing log text.
+
 ## Consequences
 
 - Each Linux host carries its own SII traffic and can reauthenticate without a

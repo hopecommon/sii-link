@@ -61,11 +61,15 @@ func TestPutReadsOnlyStdinAndDoesNotEchoSecrets(t *testing.T) {
 
 func TestStatusAndRevokeExposeNoCredentialValues(t *testing.T) {
 	store := &fakeCredentialStore{credentials: siicas.Credentials{Username: "student-id", Password: "top-secret"}}
-	for _, args := range [][]string{{"status"}, {"revoke"}, {"status"}} {
+	for index, args := range [][]string{{"status"}, {"revoke"}, {"status"}} {
 		var stdout, stderr bytes.Buffer
 		code := run(args, strings.NewReader(""), &stdout, &stderr, store)
-		if code != 0 {
-			t.Fatalf("%v exit code = %d, stderr = %q", args, code, stderr.String())
+		wantCode := 0
+		if index == 2 {
+			wantCode = credentialUnavailableExit
+		}
+		if code != wantCode {
+			t.Fatalf("%v exit code = %d, want %d, stderr = %q", args, code, wantCode, stderr.String())
 		}
 		if strings.Contains(stdout.String(), "student-id") || strings.Contains(stdout.String(), "top-secret") {
 			t.Fatalf("%v stdout exposed credentials: %q", args, stdout.String())

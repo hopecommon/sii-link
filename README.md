@@ -87,6 +87,9 @@ sii-link credentials status
 sii-link credentials revoke
 ```
 
+`credentials status` 在凭据可用时退出 0，不可用时仍输出状态 JSON 并退出 3，
+便于 systemd `ExecCondition` 等调用方安全跳过启动。
+
 默认没有 TTL：凭据持续到显式 revoke、内核清理或机器重启。`--ttl` 只用于
 临时主机。kernel keyring 不落盘，但不能防护 root 或同一 UID 下的其他进程；
 不要在 shared-root 账户中导入个人凭据。

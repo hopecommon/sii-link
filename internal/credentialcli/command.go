@@ -12,6 +12,7 @@ import (
 )
 
 const maxCredentialInput = 16 * 1024
+const credentialUnavailableExit = 3
 
 type credentialStore interface {
 	Put(siicas.Credentials, time.Duration) (siicas.CredentialStatus, error)
@@ -87,11 +88,17 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, store credent
 			fmt.Fprintf(stderr, "read credential status: %v\n", err)
 			return 1
 		}
-		return writeJSON(stdout, map[string]any{
+		if code := writeJSON(stdout, map[string]any{
 			"available":  status.Available,
 			"storage":    "linux-kernel-keyring",
 			"expires_at": status.ExpiresAt,
-		}, stderr)
+		}, stderr); code != 0 {
+			return code
+		}
+		if !status.Available {
+			return credentialUnavailableExit
+		}
+		return 0
 
 	case "revoke":
 		if len(args) != 1 {
