@@ -32,7 +32,9 @@ the Linux production path.
 The key is linked into both the per-UID user keyring and persistent keyring.
 The user-keyring link keeps it anchored while the user manager or SII Link is
 active; the persistent link provides restart and logout recovery subject to
-the host kernel policy.
+the host kernel policy. Credential lookup searches the persistent ring first,
+because an SSH login and `systemd --user` can have different user-keyring views
+even though they run under the same UID.
 
 The existing `CredentialSource` seam owns all credential lookup. Linux adds a
 kernel-keyring adapter; CAS protocol and ticket construction do not learn

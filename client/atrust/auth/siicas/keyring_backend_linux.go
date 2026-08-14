@@ -31,7 +31,7 @@ func (systemKeyringBackend) Put(payload []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	keyID, err := unix.KeyctlSearch(unix.KEY_SPEC_USER_KEYRING, "user", credentialKeyDescription, 0)
+	keyID, err := searchCredentialKey(ringID)
 	if err == nil {
 		if _, err := unix.KeyctlBuffer(unix.KEYCTL_UPDATE, keyID, payload, 0); err != nil {
 			return 0, fmt.Errorf("update credential key: %w", err)
@@ -119,14 +119,25 @@ func persistentUserKeyring() (int, error) {
 }
 
 func findCredentialKey() (int, error) {
-	if _, err := persistentUserKeyring(); err != nil {
+	persistentRingID, err := persistentUserKeyring()
+	if err != nil {
 		return 0, err
 	}
-	keyID, err := unix.KeyctlSearch(unix.KEY_SPEC_USER_KEYRING, "user", credentialKeyDescription, 0)
-	if err != nil {
-		return 0, normalizeKeyringError(err)
+	return searchCredentialKey(persistentRingID)
+}
+
+func searchCredentialKey(persistentRingID int) (int, error) {
+	for _, ringID := range []int{persistentRingID, unix.KEY_SPEC_USER_KEYRING} {
+		keyID, err := unix.KeyctlSearch(ringID, "user", credentialKeyDescription, 0)
+		if err == nil {
+			return keyID, nil
+		}
+		normalized := normalizeKeyringError(err)
+		if !errors.Is(normalized, ErrCredentialUnavailable) {
+			return 0, normalized
+		}
 	}
-	return keyID, nil
+	return 0, ErrCredentialUnavailable
 }
 
 func linkCredentialKey(keyID, persistentRingID int) error {
