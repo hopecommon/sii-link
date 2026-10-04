@@ -53,6 +53,7 @@ type Client struct {
 
 	skipTCPTunnelWait bool
 	casTicketProvider auth.CASTicketProvider
+	loginGate         auth.LoginGate
 	verifyServerTLS   bool
 	tcpTunnelPoolSize int
 	tcpTunnelPool     *tcpTunnelPool
@@ -65,6 +66,8 @@ func (c *Client) SetSkipTCPTunnelWait(skip bool) {
 func (c *Client) SetCASTicketProvider(provider auth.CASTicketProvider) {
 	c.casTicketProvider = provider
 }
+
+func (c *Client) SetLoginGate(gate auth.LoginGate) { c.loginGate = gate }
 
 func (c *Client) SetVerifyServerTLS(verify bool) {
 	c.verifyServerTLS = verify
@@ -325,6 +328,7 @@ func (c *Client) Setup(serverAddress string, serverPort int, username, password,
 		loginResult, err := sess.Login(loginMethod, auth.LoginOptions{
 			DeviceID: c.DeviceID,
 			Cookies:  loginCookies,
+			Gate:     c.loginGate,
 		})
 		if err != nil {
 			log.Println("Login error:", err)

@@ -31,6 +31,11 @@ SII Link 是 [ZJU Connect](https://github.com/Mythologyli/zju-connect) 的修改
 
 ## macOS 快速开始
 
+多机切换使用 `sii server`、`sii client <SSH主机>`、`sii off`。Supervisor 保持运行，
+按本机保存的角色恢复；首次安装默认为 Off，显式选择 Server 才授予新登录权限。
+`sii status --json` 与 `sii doctor --json` 提供只读诊断。配置、交接、恢复与剩余
+竞争说明见 [Gateway roles and recovery](docs/gateway.md)。
+
 从 [Releases](https://github.com/hopecommon/sii-link/releases) 下载对应架构，或运行：
 
 ```bash
@@ -56,17 +61,18 @@ security add-generic-password -U -a "$USER" -s atrust.password -w
 ~/Library/LaunchAgents/dev.hopecommon.sii-link.plist
 ```
 
-将 [LaunchAgent 模板](deploy/dev.hopecommon.sii-link.plist.example) 中的路径替换为
-绝对路径后安装：
+角色管理需要版本输出包含 `Gateway protocol: 1` 的二进制；旧版 `v1.4.1`
+尚不包含该功能。新版发布前，可在此源码目录构建并安装：
 
 ```bash
-launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/dev.hopecommon.sii-link.plist"
-launchctl enable "gui/$(id -u)/dev.hopecommon.sii-link"
-launchctl kickstart -k "gui/$(id -u)/dev.hopecommon.sii-link"
+go build -o "$HOME/.local/bin/sii-link" .
+install -m 0755 scripts/sii "$HOME/.local/bin/sii"
+sii install
+sii server
 ```
 
-服务会在图形登录后自动启动。FileVault 登录前不会启动；若 CAS cookie 已过期，
-首次后台访问 Keychain 可能需要用户确认。
+首次安装监督器选择 Off，随后显式选择 Server 或 Client。服务在图形登录后恢复
+保存的角色；Keychain 仍需当前用户解锁。完整操作见 [角色说明](docs/gateway.md)。
 
 ## Linux 快速开始
 

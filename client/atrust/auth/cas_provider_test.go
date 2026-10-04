@@ -56,7 +56,7 @@ func TestCASLoginRejectsEmptyProviderTicket(t *testing.T) {
 	}
 
 	err := method.login(session, AuthInfo{LoginURL: "/passport/v1/public/casLogin?sfDomain=cas.sii.edu.cn"})
-	if err == nil || err.Error() != "CAS ticket provider returned an empty ticket" {
-		t.Fatalf("CAS login error = %v, want empty-ticket error", err)
+	if !errors.Is(err, ErrLoginNotSubmitted) {
+		t.Fatalf("CAS login error = %v, want an unsubmitted-login error", err)
 	}
 }

@@ -22,6 +22,7 @@ import (
 	easyconnectclient "github.com/hopecommon/sii-link/client/easyconnect"
 	"github.com/hopecommon/sii-link/configs"
 	"github.com/hopecommon/sii-link/dial"
+	"github.com/hopecommon/sii-link/internal/gateway"
 	"github.com/hopecommon/sii-link/internal/hook_func"
 	"github.com/hopecommon/sii-link/internal/powerevent"
 	"github.com/hopecommon/sii-link/internal/securefile"
@@ -106,6 +107,13 @@ func main() {
 		}
 	case "atrust":
 		var err error
+		var sessionGate *gateway.Gate
+		if conf.ServerAddress == "vpn.sii.edu.cn" && conf.ServerPort == 443 {
+			sessionGate, err = gateway.NativeGate()
+			if err != nil {
+				log.Fatalf("Gateway worker permission: %s", err)
+			}
+		}
 		var resourceData []byte
 
 		if conf.ResourceFile != "" {
@@ -137,6 +145,9 @@ func main() {
 			log.Fatalf("Configure SII unattended CAS error: %s", err)
 		}
 		vpnClient.(*atrustclient.Client).SetCASTicketProvider(casTicketProvider)
+		if sessionGate != nil {
+			vpnClient.(*atrustclient.Client).SetLoginGate(sessionGate)
+		}
 
 		log.Printf("VPN protocol: %s", conf.Protocol)
 		clientData, err = vpnClient.(*atrustclient.Client).Setup(
@@ -166,6 +177,11 @@ func main() {
 				log.Fatalf("Write client data file error: %s", err)
 			}
 			log.Printf("Client data saved to %s", conf.ClientDataFile)
+		}
+		if sessionGate != nil {
+			if err := sessionGate.SessionReady(); err != nil {
+				log.Fatalf("Gateway session readiness: %s", err)
+			}
 		}
 	default:
 		log.Fatalf("Unsupported VPN protocol: %s", conf.Protocol)

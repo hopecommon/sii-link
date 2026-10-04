@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,9 @@ type CASTicketRequest struct {
 	LoginURL    string
 	CallbackURL string
 }
+
+// ErrLoginNotSubmitted means no CAS callback has reached the SII gateway.
+var ErrLoginNotSubmitted = errors.New("SII login has not been submitted")
 
 type CASTicketProvider interface {
 	Ticket(context.Context, CASTicketRequest) (string, error)
@@ -57,10 +61,10 @@ func (s *Session) loginAuthCas(loginURL, loginDomain, ticket string, provider CA
 				CallbackURL: s.casCallbackURL(loginDomain),
 			})
 			if err != nil {
-				return fmt.Errorf("get CAS ticket: %w", err)
+				return errors.Join(ErrLoginNotSubmitted, fmt.Errorf("get CAS ticket: %w", err))
 			}
 			if ticket == "" {
-				return fmt.Errorf("CAS ticket provider returned an empty ticket")
+				return errors.Join(ErrLoginNotSubmitted, fmt.Errorf("CAS ticket provider returned an empty ticket"))
 			}
 			callback = s.casCallbackFromTicket(loginDomain, ticket)
 		} else {

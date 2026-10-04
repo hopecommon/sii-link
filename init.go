@@ -15,6 +15,7 @@ import (
 	"github.com/hopecommon/sii-link/client/atrust"
 	"github.com/hopecommon/sii-link/configs"
 	"github.com/hopecommon/sii-link/internal/credentialcli"
+	"github.com/hopecommon/sii-link/internal/gateway"
 )
 
 var (
@@ -162,6 +163,9 @@ func parseTOMLConfig(configFile string, conf *configs.Config) error {
 }
 
 func init() {
+	if len(os.Args) > 1 && os.Args[1] == "gateway" {
+		os.Exit(gateway.Run(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "credentials" {
 		os.Exit(credentialcli.Run(
 			os.Args[2:],
@@ -253,6 +257,7 @@ func init() {
 
 	if showVersion {
 		fmt.Printf("SII Link %s\nSource: https://github.com/hopecommon/sii-link\n", siiLinkVersionString())
+		fmt.Println("Gateway protocol: 1")
 		os.Exit(0)
 	}
 

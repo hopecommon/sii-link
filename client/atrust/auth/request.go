@@ -40,13 +40,17 @@ func (s *Session) authConfig(mod, needTicket bool) (int, []AuthInfo, error) {
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return 0, nil, fmt.Errorf("authConfig HTTP %d", resp.StatusCode)
+	}
 	body, _ := io.ReadAll(resp.Body)
 	log.DebugPrintf("Received auth config: %s", string(body))
 
 	var re struct {
+		Code *int `json:"code"`
 		Data struct {
 			AuthServerInfoList []AuthInfo `json:"authServerInfoList"`
-			IsLogin            int        `json:"isLogin"`
+			IsLogin            *int       `json:"isLogin"`
 			CSRF               string     `json:"csrfToken"`
 			Security           struct {
 				CSRF string `json:"csrfToken"`
@@ -60,6 +64,9 @@ func (s *Session) authConfig(mod, needTicket bool) (int, []AuthInfo, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	if re.Code != nil && *re.Code != 0 {
+		return 0, nil, fmt.Errorf("authConfig code %d", *re.Code)
+	}
 	log.DebugPrintf("Parsed auth config: %+v", re)
 
 	s.csrfToken = re.Data.CSRF
@@ -70,7 +77,12 @@ func (s *Session) authConfig(mod, needTicket bool) (int, []AuthInfo, error) {
 	s.pubKeyExp = re.Data.PubKeyExp
 	s.antiReplayRand = re.Data.AntiReplayRand
 
-	return re.Data.IsLogin, re.Data.AuthServerInfoList, nil
+	s.loginStatusKnown = re.Data.IsLogin != nil && (*re.Data.IsLogin == 0 || *re.Data.IsLogin == 1)
+	isLogin := 0
+	if s.loginStatusKnown {
+		isLogin = *re.Data.IsLogin
+	}
+	return isLogin, re.Data.AuthServerInfoList, nil
 }
 
 func (s *Session) reportEnv() error {

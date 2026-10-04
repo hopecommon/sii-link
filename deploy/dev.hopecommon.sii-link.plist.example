@@ -7,7 +7,9 @@
     <key>ProgramArguments</key>
     <array>
         <string>/ABSOLUTE/PATH/TO/.local/bin/sii-link</string>
-        <string>-config</string>
+        <string>gateway</string>
+        <string>run</string>
+        <string>--config</string>
         <string>/ABSOLUTE/PATH/TO/.config/sii-link/config.toml</string>
     </array>
     <key>RunAtLoad</key>

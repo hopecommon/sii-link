@@ -2,13 +2,23 @@
 
 ## macOS / SII
 
-使用用户级 LaunchAgent 模板
+SII 使用 `sii install` 安装用户级监督服务，首次安装选择 Off；
+用 `sii server` 选择本机，或 `sii client HOST` 选择 SSH 上游。
+服务管理器恢复保存的角色，监督与转发自动恢复，登录权限由控制器管理。
+详见 [Server／Client 与恢复契约](gateway.md)。
+
+用户级 LaunchAgent 模板为
 [`deploy/dev.hopecommon.sii-link.plist.example`](../deploy/dev.hopecommon.sii-link.plist.example)。
 它在用户图形登录后启动，以非零退出自动重启，并把正常日志交给应用内的有界
 轮转器。完整配置、Keychain 和休眠恢复说明见
 [SII 原生迁移指南](sii-native-migration.md)。
 
-## Linux / systemd
+## Linux / SII
+
+同样使用 `sii install` 和角色命令，生成的用户级 systemd 服务无需 root。
+Client 不读取 SII 凭据；监督启动不依赖凭据文件存在。
+
+## Linux / 通用 systemd
 
 将二进制安装到 `/usr/local/bin/sii-link`，配置安装到
 `/etc/sii-link/config.toml`。若配置包含密码或状态路径，目录和文件权限应分别为

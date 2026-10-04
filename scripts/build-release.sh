@@ -34,6 +34,9 @@ fi
 
 cp "$project_root/LICENSE" "$project_root/NOTICE.md" \
     "$project_root/THIRD_PARTY_NOTICES.md" "$project_root/README_en.md" "$stage_dir/"
+if [ "$target_os" != windows ]; then
+    install -m 0755 "$project_root/scripts/sii" "$stage_dir/sii"
+fi
 cp "$project_root/LICENSES/README.md" "$stage_dir/LICENSES/README.md"
 
 module_list="$stage_dir/.modules"

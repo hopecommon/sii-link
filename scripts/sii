@@ -1,0 +1,3 @@
+#!/bin/sh
+# The same command works in interactive shells, SSH, and agent subprocesses.
+exec "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/sii-link" gateway "$@"

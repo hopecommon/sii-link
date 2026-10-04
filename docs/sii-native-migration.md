@@ -71,19 +71,21 @@ ProxyCommand nc -X 5 -x 127.0.0.1:1080 %h %p
 
 正式配置模板是 [`configs/sii-local.toml.example`](../configs/sii-local.toml.example)，LaunchAgent 模板是 [`deploy/dev.hopecommon.sii-link.plist.example`](../deploy/dev.hopecommon.sii-link.plist.example)。所有路径必须使用绝对路径。`sii_cas_proxy` 只在直连 CAS 不可用时添加，避免把开机认证不必要地绑定到另一个本地代理的启动顺序。
 
-安装或更新用户级服务：
+安装或更新用户级监督服务：
 
 ```bash
-if launchctl print gui/$(id -u)/dev.hopecommon.sii-link >/dev/null 2>&1; then
-  launchctl bootout gui/$(id -u) "$HOME/Library/LaunchAgents/dev.hopecommon.sii-link.plist"
-fi
-launchctl bootstrap gui/$(id -u) "$HOME/Library/LaunchAgents/dev.hopecommon.sii-link.plist"
-launchctl enable gui/$(id -u)/dev.hopecommon.sii-link
-launchctl kickstart -k gui/$(id -u)/dev.hopecommon.sii-link
-launchctl print gui/$(id -u)/dev.hopecommon.sii-link
+sii install
+sii server                 # explicit local selection
+sii client Mini            # select an SSH upstream instead
+sii status --json
 ```
 
-它在用户登录图形会话后由 `RunAtLoad` 启动，不是在 FileVault 登录前启动。首次后台读取 Keychain 可能要求当前用户确认；重启后要等用户解锁 Keychain。服务正常运行时，重启进程优先复用 cookie；只有 cookie 已失效才重新 CAS。
+`install` 与服务重启恢复已保存的角色；首次安装为 Off。后台监督与代理连接继续
+自动恢复。新登录在现有 Server 权限下检查对端与事件，并使用持久化恢复额度；
+确认被替换时转为 Client。完整语义见 [角色与恢复契约](gateway.md)。
+
+用户级服务在图形登录后启动，Keychain 仍需要当前用户解锁。原生进程的健康检查、
+缓存复用和 underlay 行为保持原契约；监督器接管非零退出后的恢复。
 
 SSH 应直接连接本地 SOCKS，不再进入容器：
 
@@ -98,7 +100,7 @@ grep -E 'wake event|KeepAlive|Runtime failure|Already logged in|Starting login' 
   "$HOME/Library/Logs/sii-link/sii-link.log"
 ```
 
-正常证据应包含唤醒事件后的立即检查；若旧隧道失效，则随后出现健康失败、非零退出、launchd 拉起，以及 `Already logged in` 或仅在 cookie 失效时出现的 `Starting login`。
+正常证据应包含唤醒事件后的立即检查；若旧隧道失效，则随后出现健康失败、非零退出、监督器恢复原生进程，以及 `Already logged in` 或仅在 cookie 失效时出现的 `Starting login`。
 
 ## 回退
 

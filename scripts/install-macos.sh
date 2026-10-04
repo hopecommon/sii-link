@@ -34,5 +34,13 @@ curl -fL --retry 3 -o "$work_dir/$asset.sha256" "$base_url/$asset.sha256"
 )
 
 mkdir -p "$install_dir"
+if [ -f "$HOME/.local/state/sii-link/gateway.json" ] && \
+   ! "$work_dir/sii-link_darwin_${go_arch}/sii-link" -version | grep -qx 'Gateway protocol: 1'; then
+    echo 'This release lacks gateway support; preserving the managed installation.' >&2
+    exit 1
+fi
 install -m 0755 "$work_dir/sii-link_darwin_${go_arch}/sii-link" "$install_dir/sii-link"
+if [ -f "$work_dir/sii-link_darwin_${go_arch}/sii" ]; then
+    install -m 0755 "$work_dir/sii-link_darwin_${go_arch}/sii" "$install_dir/sii"
+fi
 "$install_dir/sii-link" -version

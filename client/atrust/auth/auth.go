@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	mathrand "math/rand"
 	"net"
@@ -73,7 +74,8 @@ type Session struct {
 	antiReplayRand string
 	ticket         string
 
-	response map[string]json.RawMessage
+	response         map[string]json.RawMessage
+	loginStatusKnown bool
 }
 
 func NewSession(server string, dialContext ...func(context.Context, string, string) (net.Conn, error)) *Session {
@@ -112,7 +114,16 @@ type AuthInfo struct {
 type LoginOptions struct {
 	DeviceID string
 	Cookies  []Cookie
+	Gate     LoginGate
 }
+
+// LoginGate authorizes creation of a session after cached-cookie validation.
+type LoginGate interface {
+	BeforeLogin() error
+	AfterLogin(error)
+}
+
+var ErrSessionInvalid = errors.New("existing aTrust session is invalid")
 
 type LoginResult struct {
 	Username string
@@ -263,7 +274,7 @@ func (s *Session) completeSMS(step authStep) (authStep, error) {
 	return s.smsCheckCode(step)
 }
 
-func (s *Session) Login(method LoginMethod, opts LoginOptions) (LoginResult, error) {
+func (s *Session) Login(method LoginMethod, opts LoginOptions) (result LoginResult, resultErr error) {
 	sid := ""
 	if len(opts.Cookies) > 0 {
 		for _, cookie := range opts.Cookies {
@@ -286,6 +297,9 @@ func (s *Session) Login(method LoginMethod, opts LoginOptions) (LoginResult, err
 	if err != nil {
 		return LoginResult{}, err
 	}
+	if !s.loginStatusKnown {
+		return LoginResult{}, errors.New("gateway did not provide a valid session status")
+	}
 	if isLogin == 1 {
 		log.Println("Already logged in")
 		username, err := s.onlineInfo()
@@ -297,7 +311,7 @@ func (s *Session) Login(method LoginMethod, opts LoginOptions) (LoginResult, err
 	}
 
 	if method == nil {
-		return LoginResult{}, fmt.Errorf("login method is nil, but user is not logged in")
+		return LoginResult{}, ErrSessionInvalid
 	}
 	var foundAuthInfo *AuthInfo
 	for _, authInfo := range authInfoList {
@@ -311,6 +325,12 @@ func (s *Session) Login(method LoginMethod, opts LoginOptions) (LoginResult, err
 		return LoginResult{}, fmt.Errorf("auth type/login domain combination not found: auth type: %s, login domain: %s", method.AuthType(), method.LoginDomain())
 	}
 
+	if opts.Gate != nil {
+		if err := opts.Gate.BeforeLogin(); err != nil {
+			return LoginResult{}, err
+		}
+		defer func() { opts.Gate.AfterLogin(resultErr) }()
+	}
 	log.Printf("Starting login with auth type: %s, login domain: %s", method.AuthType(), method.LoginDomain())
 	err = method.login(s, *foundAuthInfo)
 	if err != nil {

@@ -1,5 +1,13 @@
 # SII Link
 
+Gateway control requires `Gateway protocol: 1` in the binary version output.
+Release v1.4.1 predates it; build this checkout until a new release is published.
+
+For paired-machine operation, use `sii server`, `sii client <SSH peer>` and
+`sii off`. The supervisor restores saved intent and starts in Off on first
+installation. Read-only diagnostics are `sii status --json` and
+`sii doctor --json`. See [gateway roles and recovery](docs/gateway.md).
+
 English | [中文](README.md)
 
 SII Link is a lightweight command-line client for SII aTrust deployments. It
