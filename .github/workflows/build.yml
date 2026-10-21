@@ -19,7 +19,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
           cache: true
       - name: Download dependencies
         run: go mod download
@@ -46,7 +47,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
           cache: true
       - name: Build release archive
         env:

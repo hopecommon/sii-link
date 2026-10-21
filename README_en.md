@@ -172,7 +172,7 @@ external `logrotate` service is required.
 
 ## Build and release
 
-Use Go 1.25.6 or a compatible toolchain:
+Use Go 1.26.0 or a compatible toolchain:
 
 ```bash
 go test ./...
