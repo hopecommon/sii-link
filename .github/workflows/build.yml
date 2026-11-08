@@ -11,6 +11,26 @@ permissions:
   contents: read
 
 jobs:
+  dependency-graph:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
+          cache: true
+      - name: Submit resolved Go dependencies
+        uses: actions/go-dependency-submission@v2
+        with:
+          go-mod-path: go.mod
+          go-build-target: ./...
+
   test:
     runs-on: ubuntu-latest
     steps:

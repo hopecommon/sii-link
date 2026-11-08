@@ -170,6 +170,8 @@ go build -trimpath -o sii-link .
 
 ## 安全与隐私
 
+依赖安全与当前构建核查见 [compress 告警及依赖图同步记录](docs/audits/2026-11-09-compress-alert.md)。
+
 - `client-data.json` 含会话 cookie，应保持 `0600`，不要提交或分享。
 - Linux kernel keyring 凭据默认不设 TTL，但不会跨重启；需要时从可信机器重新
   授权。它不提供 root 或同 UID 进程之间的隔离。
