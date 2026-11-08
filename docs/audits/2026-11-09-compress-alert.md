@@ -47,6 +47,26 @@ GitHub 官方说明：用户提交的依赖快照优先于静态扫描与自动�
 [依赖提交 API](https://docs.github.com/en/rest/dependency-graph/dependency-submission)
 与 [官方 Action](https://github.com/actions/go-dependency-submission)。
 
-远端完成标准：dependency-graph job 成功，SBOM 中 compress 为 `v1.20.3`，
-告警 #1 被 GitHub 判定为 fixed，开放告警为空。远端最终结果在本文件的提交后
-验收中记录；在观察到这些结果前，不把 CI 配置提交本身当作告警已关闭。
+## 最终结果
+
+变更提交 `9f215c4` 的
+[远端 CI](https://github.com/hopecommon/sii-link/actions/runs/42506429100)
+已完成，结论为 success：测试、静态检查、依赖图提交及五个平台构建均成功。
+此次 main 推送没有发布 release。
+
+依赖图提交的
+[job 128809956629](https://github.com/hopecommon/sii-link/actions/runs/42506429100/job/128809956629)
+成功后再次通过 GitHub API 核对：
+
+```text
+SBOM github.com/klauspost/compress: v1.20.3
+Dependabot alert #1 state: fixed
+fixed_at: 2026-11-08T17:44:22Z
+open Dependabot alerts: 0
+```
+
+本地 `actionlint v1.7.12` 与暂存改动的 `git diff --check` 通过。
+审查确认本次仅改变依赖图同步与证据文档，未改动 Go 运行时依赖、VPN 登录或
+代理配置。没有阻断项。当前告警已经由 GitHub 根据实际依赖关闭，未手动 dismiss。
+后续验收文档提交使用 `[skip ci]`，避免为纯文档重复构建；上述行为与权限检查
+对应包含工作流改动的提交，不以跳过的工作流代替验证。
