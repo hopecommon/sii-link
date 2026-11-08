@@ -20,35 +20,37 @@ import (
 const Protocol = 1
 
 type State struct {
-	Role        string `json:"role"`
-	Peer        string `json:"peer,omitempty"`
-	Self        string `json:"self,omitempty"`
-	Config      string `json:"config"`
-	Epoch       uint64 `json:"epoch"`
-	Attempt     uint64 `json:"attempt"`
-	Budget      bool   `json:"renewal_available"`
-	Pending     bool   `json:"login_pending"`
-	Pause       string `json:"pause_reason,omitempty"`
-	Cursor      string `json:"event_cursor,omitempty"`
-	SessionHash string `json:"session_hash,omitempty"`
+	Role        string    `json:"role"`
+	Peer        string    `json:"peer,omitempty"`
+	Self        string    `json:"self,omitempty"`
+	Config      string    `json:"config"`
+	Epoch       uint64    `json:"epoch"`
+	Attempt     uint64    `json:"attempt"`
+	Budget      bool      `json:"renewal_available"`
+	Pending     bool      `json:"login_pending"`
+	Pause       string    `json:"pause_reason,omitempty"`
+	Cursor      string    `json:"event_cursor,omitempty"`
+	SessionHash string    `json:"session_hash,omitempty"`
+	RenewAfter  time.Time `json:"renewal_after,omitzero"`
 }
 
 type Status struct {
-	Protocol         int    `json:"protocol"`
-	Role             string `json:"role"`
-	Peer             string `json:"peer,omitempty"`
-	Config           string `json:"config"`
-	Epoch            uint64 `json:"epoch"`
-	Attempt          uint64 `json:"attempt"`
-	Running          bool   `json:"supervisor_running"`
-	ProviderRunning  bool   `json:"provider_running"`
-	Ready            bool   `json:"ready"`
-	Transitioning    bool   `json:"transitioning"`
-	LoginPending     bool   `json:"login_pending"`
-	RenewalAvailable bool   `json:"renewal_available"`
-	Pause            string `json:"pause_reason,omitempty"`
-	Error            string `json:"last_error,omitempty"`
-	CommandError     string `json:"command_error,omitempty"`
+	Protocol         int       `json:"protocol"`
+	Role             string    `json:"role"`
+	Peer             string    `json:"peer,omitempty"`
+	Config           string    `json:"config"`
+	Epoch            uint64    `json:"epoch"`
+	Attempt          uint64    `json:"attempt"`
+	Running          bool      `json:"supervisor_running"`
+	ProviderRunning  bool      `json:"provider_running"`
+	Ready            bool      `json:"ready"`
+	Transitioning    bool      `json:"transitioning"`
+	LoginPending     bool      `json:"login_pending"`
+	RenewalAvailable bool      `json:"renewal_available"`
+	RenewAfter       time.Time `json:"renewal_after,omitzero"`
+	Pause            string    `json:"pause_reason,omitempty"`
+	Error            string    `json:"last_error,omitempty"`
+	CommandError     string    `json:"command_error,omitempty"`
 }
 
 type localConfig struct {
@@ -134,6 +136,8 @@ func saveState(dir string, s State) error {
 }
 
 const stableWindow = 2 * time.Minute
+
+const standaloneCooldown = 5 * time.Minute
 
 var errBusy = errors.New("gateway busy; wait for authentication or handover")
 

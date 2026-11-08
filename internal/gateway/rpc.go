@@ -16,15 +16,16 @@ import (
 )
 
 type request struct {
-	Action    string `json:"action"`
-	Peer      string `json:"peer,omitempty"`
-	Self      string `json:"self,omitempty"`
-	Config    string `json:"config,omitempty"`
-	Epoch     uint64 `json:"epoch,omitempty"`
-	Attempt   uint64 `json:"attempt,omitempty"`
-	Success   bool   `json:"success,omitempty"`
-	PID       int    `json:"pid,omitempty"`
-	RetrySafe bool   `json:"retry_safe,omitempty"`
+	Action     string `json:"action"`
+	Peer       string `json:"peer,omitempty"`
+	Self       string `json:"self,omitempty"`
+	Config     string `json:"config,omitempty"`
+	Epoch      uint64 `json:"epoch,omitempty"`
+	Attempt    uint64 `json:"attempt,omitempty"`
+	Success    bool   `json:"success,omitempty"`
+	PID        int    `json:"pid,omitempty"`
+	RetrySafe  bool   `json:"retry_safe,omitempty"`
+	Standalone bool   `json:"standalone,omitempty"`
 }
 
 type response struct {

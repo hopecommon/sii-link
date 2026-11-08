@@ -19,7 +19,7 @@ import (
 
 func Run(args []string, output, stderr io.Writer) int {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		fmt.Fprintln(output, "Usage: sii {server|client HOST|off|status|doctor|install|run} [--config PATH] [--peer HOST] [--self HOST] [--json]\nserver selects this gateway; client selects an SSH upstream; install/run restore the saved role.")
+		fmt.Fprintln(output, "Usage: sii {server|client HOST|off|status|doctor|install|run} [--config PATH] [--peer HOST] [--self HOST] [--json]\nserver --standalone selects local login and forgets the peer; client selects an SSH upstream; install/run restore the saved role.")
 		return 0
 	}
 	action := args[0]
@@ -33,6 +33,7 @@ func Run(args []string, output, stderr io.Writer) int {
 	flags.StringVar(&r.Config, "config", "", "native SII configuration path")
 	flags.StringVar(&r.Peer, "peer", r.Peer, "SSH peer or upstream")
 	flags.StringVar(&r.Self, "self", "", "SSH address the peer uses for this machine")
+	flags.BoolVar(&r.Standalone, "standalone", false, "select local Server and forget the saved SSH peer")
 	dir := flags.String("state-dir", defaultDir(), "private gateway state directory")
 	jsonOutput := flags.Bool("json", false, "emit machine-readable status")
 	if err := flags.Parse(args); err != nil {
@@ -40,6 +41,10 @@ func Run(args []string, output, stderr io.Writer) int {
 	}
 	if flags.NArg() != 0 {
 		fmt.Fprintln(stderr, "unexpected arguments")
+		return 2
+	}
+	if r.Standalone && (action != "server" || r.Peer != "") {
+		fmt.Fprintln(stderr, "--standalone requires server without --peer")
 		return 2
 	}
 	if action == "config" {
@@ -137,7 +142,7 @@ func Run(args []string, output, stderr io.Writer) int {
 			fmt.Fprintln(stderr, readErr)
 			return 1
 		}
-		status = Status{Protocol: Protocol, Role: saved.Role, Peer: saved.Peer, Config: saved.Config, Epoch: saved.Epoch, Pause: saved.Pause, LoginPending: saved.Pending, RenewalAvailable: saved.Budget}
+		status = Status{Protocol: Protocol, Role: saved.Role, Peer: saved.Peer, Config: saved.Config, Epoch: saved.Epoch, Pause: saved.Pause, LoginPending: saved.Pending, RenewalAvailable: saved.Budget, RenewAfter: saved.RenewAfter}
 		if action != "status" && action != "doctor" {
 			if r.Config == "" {
 				r.Config = saved.Config

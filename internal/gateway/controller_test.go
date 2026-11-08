@@ -7,7 +7,97 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 )
+
+func TestStandaloneSelectionClearsSavedPeerWithoutContactingIt(t *testing.T) {
+	c := testController(t)
+	c.state.Peer = "Mini"
+	c.peer = func(context.Context, string, ...string) (Status, error) {
+		t.Fatal("standalone selection contacted the saved peer")
+		return Status{}, nil
+	}
+	if err := c.dispatch(context.Background(), request{Action: "server", Standalone: true}); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := readState(c.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Role != "server" || saved.Peer != "" || !saved.Budget {
+		t.Fatalf("standalone intent not persisted: %+v", saved)
+	}
+}
+
+func TestStandaloneLossRecoversAfterCooldownAcrossRestart(t *testing.T) {
+	c := testController(t)
+	ctx := context.Background()
+	if err := c.dispatch(ctx, request{Action: "login", PID: 123, Epoch: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.dispatch(ctx, request{Action: "session-ready", PID: 123, Epoch: 1, Attempt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	// The Mac sleeps before two minutes of continuous healthy probes. No health
+	// receipt replenishes the budget, and the cached session is lost on wake.
+	if c.state.RenewAfter.IsZero() {
+		t.Fatal("fresh login has no persisted cooldown")
+	}
+	saved, err := readState(c.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restarted := &controller{dir: c.dir, state: saved, pid: 456}
+	if err := restarted.dispatch(ctx, request{Action: "login", PID: 456, Epoch: 1}); err == nil {
+		t.Fatal("rapid reauthentication was admitted")
+	}
+	if restarted.state.Pause != "" {
+		t.Fatal("temporary cooldown became a permanent pause")
+	}
+	c.state.RenewAfter = time.Now().Add(-time.Second)
+	if err := saveState(c.dir, c.state); err != nil {
+		t.Fatal(err)
+	}
+	saved, err = readState(c.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restarted = &controller{dir: c.dir, state: saved, pid: 456}
+	if err := restarted.dispatch(ctx, request{Action: "login", PID: 456, Epoch: 1}); err != nil {
+		t.Fatalf("ordinary loss deadlocked after sleep and restart: %v", err)
+	}
+	if !restarted.state.Pending || restarted.state.Budget || restarted.state.Attempt != 2 || !restarted.state.RenewAfter.After(time.Now()) {
+		t.Fatalf("new attempt did not reserve its own cooldown: %+v", restarted.state)
+	}
+}
+
+func TestCooldownCannotOverridePausedPendingOrPairedAuthority(t *testing.T) {
+	for _, condition := range []string{"pending", "uncertain", "policy", "paired", "off"} {
+		t.Run(condition, func(t *testing.T) {
+			c := testController(t)
+			c.state.Budget = false
+			c.state.RenewAfter = time.Now().Add(-time.Hour)
+			switch condition {
+			case "pending":
+				c.state.Pending = true
+			case "uncertain":
+				c.state.Pause = "authentication outcome uncertain"
+			case "policy":
+				c.observeLogout(1, 0, "admin")
+			case "paired":
+				c.state.Peer = "peer-host"
+			case "off":
+				c.observeLogout(1, 0, "relogin")
+			}
+			if err := c.dispatch(context.Background(), request{Action: "login", PID: 123, Epoch: 1}); err == nil {
+				t.Fatal("cooldown overrode a blocking authority decision")
+			}
+			if c.state.Attempt != 0 || c.state.Budget {
+				t.Fatal("denied login granted new authority")
+			}
+		})
+	}
+}
 
 func testController(t *testing.T) *controller {
 	t.Helper()

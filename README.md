@@ -31,7 +31,9 @@ SII Link 是 [ZJU Connect](https://github.com/Mythologyli/zju-connect) 的修改
 
 ## macOS 快速开始
 
-多机切换使用 `sii server`、`sii client <SSH主机>`、`sii off`。Supervisor 保持运行，
+独立登录使用 `sii server --standalone`，清除旧 SSH 上游并由本机登录。
+普通会话失效在冷却后自动恢复，不要求每次睡眠前连续健康运行两分钟。
+可选的多机切换使用 `sii server --peer <SSH主机>`、`sii client <SSH主机>`、`sii off`。Supervisor 保持运行，
 按本机保存的角色恢复；首次安装默认为 Off，显式选择 Server 才授予新登录权限。
 `sii status --json` 与 `sii doctor --json` 提供只读诊断。配置、交接、恢复与剩余
 竞争说明见 [Gateway roles and recovery](docs/gateway.md)。

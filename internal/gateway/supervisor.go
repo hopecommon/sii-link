@@ -40,7 +40,7 @@ func (c *controller) status() Status {
 	s := c.state
 	return Status{Protocol: Protocol, Role: s.Role, Peer: s.Peer, Config: s.Config, Epoch: s.Epoch, Attempt: s.Attempt,
 		Running: true, ProviderRunning: c.pid != 0, Ready: c.ready, Transitioning: c.switching,
-		LoginPending: s.Pending, RenewalAvailable: s.Budget, Pause: s.Pause, Error: c.lastError}
+		LoginPending: s.Pending, RenewalAvailable: s.Budget, RenewAfter: s.RenewAfter, Pause: s.Pause, Error: c.lastError}
 }
 
 func (c *controller) persistLocked(next State) error {
@@ -76,6 +76,9 @@ func (c *controller) stop(ctx context.Context) error {
 }
 
 func (c *controller) selectRole(ctx context.Context, r request) error {
+	if r.Standalone && (r.Action != "server" || r.Peer != "") {
+		return errors.New("--standalone requires server without --peer")
+	}
 	if !c.changing.TryLock() {
 		return errBusy
 	}
@@ -109,13 +112,16 @@ func (c *controller) selectRole(ctx context.Context, r request) error {
 		}
 		next.Self = r.Self
 	}
+	if r.Standalone {
+		next.Peer, next.Self = "", ""
+	}
 	// Stop our old relay before the peer starts forwarding back to this machine.
 	if err := c.stop(ctx); err != nil {
 		return err
 	}
 	switch r.Action {
 	case "server":
-		if next.Self == "" {
+		if next.Peer != "" && next.Self == "" {
 			var err error
 			next.Self, err = selfAddress(ctx)
 			if err != nil {
@@ -160,6 +166,7 @@ func (c *controller) selectRole(ctx context.Context, r request) error {
 		return err
 	}
 	next.Pending, next.Pause, next.Cursor, next.SessionHash = false, "", "", ""
+	next.RenewAfter = time.Time{}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.ready, c.lastError = false, ""
@@ -172,6 +179,20 @@ func (c *controller) beforeLogin(ctx context.Context, r request) error {
 	if r.PID != c.pid || c.pid == 0 || r.Epoch != s.Epoch || s.Role != "server" || c.switching {
 		c.mu.Unlock()
 		return errors.New("gateway login authority changed")
+	}
+	// Standalone recovery must not depend on two uninterrupted minutes of
+	// network health during a short macOS dark wake. The persisted deadline
+	// limits fresh authentication across worker and supervisor restarts.
+	if !s.Budget && !s.Pending && s.Pause == "" && s.Peer == "" && !s.RenewAfter.IsZero() {
+		if time.Now().Before(s.RenewAfter) {
+			c.mu.Unlock()
+			return fmt.Errorf("fresh login cooling down until %s", s.RenewAfter.Format(time.RFC3339))
+		}
+		s.Budget = true
+		if err := c.persistLocked(s); err != nil {
+			c.mu.Unlock()
+			return err
+		}
 	}
 	if s.Pending || s.Pause != "" || !s.Budget {
 		if s.Pause == "" {
@@ -219,6 +240,9 @@ func (c *controller) beforeLogin(ctx context.Context, r request) error {
 	next := c.state
 	next.Attempt++
 	next.Budget, next.Pending = false, true
+	if next.Peer == "" {
+		next.RenewAfter = time.Now().Add(standaloneCooldown)
+	}
 	return c.persistLocked(next)
 }
 
@@ -249,6 +273,7 @@ func (c *controller) dispatch(ctx context.Context, r request) error {
 			s.Pending = false
 			if r.RetrySafe {
 				s.Budget, s.Pause = true, ""
+				s.RenewAfter = time.Time{}
 			} else {
 				s.Pause = "authentication outcome uncertain; cached resume remains available, inspect sii doctor"
 			}
@@ -388,6 +413,7 @@ func (c *controller) runWorker(ctx context.Context, snapshot State) error {
 			if snapshot.Role == "server" && ok && time.Since(readySince) >= stableWindow && !c.state.Pending && c.state.Pause == "" && !c.state.Budget {
 				next := c.state
 				next.Budget = true
+				next.RenewAfter = time.Time{}
 				if err := c.persistLocked(next); err != nil {
 					c.lastError = "unable to persist renewal budget"
 				}
@@ -582,6 +608,7 @@ func (c *controller) observeLogout(epoch, attempt uint64, reason string) {
 	switch reason {
 	case "relogin", "trustDevice":
 		next.Role, next.Budget = "off", false
+		next.RenewAfter = time.Time{}
 		if next.Peer != "" {
 			next.Role = "client"
 		}
